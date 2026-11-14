@@ -12,7 +12,7 @@ On the **Ryzen 5700G / single RTX 3080 PC**, open Windows PowerShell or PowerShe
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1 | iex
 ```
 
-This downloads the current repository snapshot, runs only this display's setup, and starts the portrait dashboard. It executes code from this repository. `uv` from the existing PC setup must be available; otherwise use [its official Windows installation instructions](https://docs.astral.sh/uv/getting-started/installation/), then reopen PowerShell. The launcher requires only Windows PowerShell 5.1 or newer, not PowerShell 7.
+This downloads the current repository snapshot, runs only this display's setup, and starts the portrait dashboard. It executes code from this repository. `uv` from the existing PC setup must be available; otherwise use [its official Windows installation instructions](https://docs.astral.sh/uv/getting-started/installation/), then reopen PowerShell. The launcher requires only Windows PowerShell 5.1 or newer, not PowerShell 7. Setup and the display runner execute in a child PowerShell process with `-ExecutionPolicy Bypass`; this does not change your saved execution policy. Organization-enforced Group Policy still takes precedence.
 
 The launcher is named `install.ps1`, distinct from the existing `Run.ps1` because Windows filenames are case-insensitive. It retains its downloaded setup under `%LOCALAPPDATA%\AX206Panel\setup-runs`, copies the runner to `%LOCALAPPDATA%\AX206Panel\Run.ps1`, and preserves your existing `portrait.yaml`. Rerunning setup reuses the existing Python environment and upstream libraries; it still checks Python dependencies. It does not install or change USB drivers or PawnIO.
 
@@ -26,10 +26,10 @@ For setup without starting the screen, or to pass a different rotation, use the 
 After setup, start again or diagnose the display without downloading anything:
 
 ```powershell
-& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Info
-& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action TestPattern
-& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Sensors
-& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Rotation 270
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Info
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action TestPattern
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Sensors
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Rotation 270
 ```
 
 If you already have a local copy of this folder, `.\Setup.ps1` followed by `.\Run.ps1` still works. A custom `-InstallDir` is accepted by the launcher, setup and runner; use the same directory each time. The launcher prints exact restart and diagnostic commands for your chosen directory.
@@ -41,7 +41,7 @@ If you already have a local copy of this folder, `.\Setup.ps1` followed by `.\Ru
 
 For a preview without USB writes:
 ```powershell
-& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Preview
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Preview
 ```
 This saves `%LOCALAPPDATA%\AX206Panel\preview.png` using **synthetic demonstration readings**, not live temperatures. You can edit `%LOCALAPPDATA%\AX206Panel\portrait.yaml`; rerunning Setup preserves that theme. Restart the panel after editing. `-InstallDir` is supported on both scripts; use the same path for each.
 
