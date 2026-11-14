@@ -8,7 +8,12 @@ if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
 }
 function Install-WingetApp([string]$Id) {
     Write-Host "Installing $Id ..."
-    & winget.exe install --exact --id $Id --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity --no-upgrade
+    $installArgs = @('install','--exact','--id',$Id,'--source','winget',
+        '--accept-source-agreements','--accept-package-agreements','--disable-interactivity','--no-upgrade')
+    # Mozilla's WinGet entry also offers MSIX. The JSON-policy stage needs the
+    # unpackaged desktop build. Keep --no-upgrade to preserve recognized installs.
+    if ($Id -eq 'Mozilla.Firefox') { $installArgs += @('--installer-type','exe') }
+    & winget.exe @installArgs
     $code = '0x{0:X8}' -f ([long]$LASTEXITCODE -band 0xFFFFFFFFL)
     # APPINSTALLER_CLI_ERROR_INSTALL_ALREADY_INSTALLED
     if ($code -notin @('0x00000000', '0x8A150061', '0x8A15010D')) { throw "winget $Id failed, exit code $code" }
@@ -102,4 +107,5 @@ Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.
 # Use the exact SignalRGB installer supplied by the user.
 Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe' -DisplayNamePattern '^SignalRGB(?:$|\s)' -SignalRgb
 Write-Host 'Application installer stage finished.'
+
 
