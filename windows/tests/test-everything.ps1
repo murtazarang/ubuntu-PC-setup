@@ -26,7 +26,7 @@ function Get-Command {
     }
 }
 function fake-uv { $global:LASTEXITCODE = 0 }
-function Test-Path { param($LiteralPath) return $true }
+function Test-Path { param($LiteralPath, $PathType) return $true }
 function Get-Service { param($Name, $ErrorAction) if ($EverythingTestFixture.ServiceExists) { [pscustomobject]@{ Name = 'Everything' } } }
 function Start-Service { param($Name, $ErrorAction) if ($Name -ne 'Everything') { throw 'Unmocked service.' } }
 function Start-Process {
@@ -57,5 +57,3 @@ try { & $target; throw 'Expected package failure.' } catch {
 }
 if ($EverythingTestFixture.Packages.Count -ne 1 -or $EverythingTestFixture.Commands.Count -ne 0) { throw 'Continued after package failure.' }
 Write-Host 'Four mocked Everything installation cases passed; no installer or service was run.'
-
-$global:LASTEXITCODE = 0 # Failed native-command fixture must not fail the successful test process.
