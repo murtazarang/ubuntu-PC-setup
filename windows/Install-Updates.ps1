@@ -3,12 +3,22 @@
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$systemInfo = New-Object -ComObject Microsoft.Update.SystemInfo
+if ($systemInfo.RebootRequired) {
+    throw 'Windows already has a pending update restart. Restart and rerun the Drivers stage.'
+}
 $session = New-Object -ComObject Microsoft.Update.Session
 $search = $session.CreateUpdateSearcher()
 $result = $search.Search("IsInstalled=0 and IsHidden=0 and Type='Software'")
 $updates = New-Object -ComObject Microsoft.Update.UpdateColl
 $manual = @()
 foreach ($update in $result.Updates) {
+    # WUA exclusive updates cannot share a batch with other updates. Leave them
+    # to Windows Update rather than silently mixing them into this batch.
+    if ($update.InstallationBehavior.Impact -eq 2) {
+        $manual += "$($update.Title) (requires a separate installation)"
+        continue
+    }
     if (-not $update.EulaAccepted -or $update.InstallationBehavior.CanRequestUserInput) {
         $manual += $update.Title
         continue
@@ -28,6 +38,6 @@ if ($updates.Count -gt 0) {
     if ($result.RebootRequired) { throw 'Windows updates require a reboot. Restart and rerun the Drivers stage.' }
 } else { Write-Host 'No automatically installable Windows software updates found.' }
 if ($manual.Count -gt 0) {
-    Write-Warning 'Some updates require user interaction or a license response; finish them in Windows Update:'
+    Write-Warning 'Some updates require separate installation, user interaction or a license response; finish them in Windows Update:'
     $manual | ForEach-Object { Write-Warning $_ }
 }
