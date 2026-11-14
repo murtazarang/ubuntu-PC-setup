@@ -25,4 +25,5 @@ $global:mockExit = 1
 $failed = $false
 try { Install-WingetApp 'Mozilla.Firefox' } catch { $failed = $true }
 if (-not $failed) { throw 'Failed installer must stop setup' }
+$global:LASTEXITCODE = 0
 Write-Host 'Firefox installer-type mocked checks passed.'
