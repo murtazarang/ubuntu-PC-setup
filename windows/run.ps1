@@ -32,13 +32,15 @@ if (-not $Stage) {
         default { throw 'Invalid stage choice; nothing was installed.' }
     }
 }
-# WinGet installs MSIX by default in PowerShell 7.6 and later. Resolve both
-# MSI and the registered MSIX instead of assuming an MSI-only path.
+# WinGet defaults to MSIX from PowerShell 7.6; support MSIX and MSI.
 function Test-PowerShell7Candidate([string]$Path) {
     if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     try {
         $version = @(& $Path -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.Major' 2>$null)
-        return $LASTEXITCODE -eq 0 -and $version.Count -eq 1 -and "$($version[0])" -match '^[0-9]+
+        return $LASTEXITCODE -eq 0 -and $version.Count -eq 1 -and "$($version[0])" -match '^[0-9]+$' -and [int]$version[0] -ge 7
+    } catch { return $false }
+}
+function Find-PowerShell7 {
     $command = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($command -and (Test-PowerShell7Candidate $command.Source)) { return $command.Source }
     $msi = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
