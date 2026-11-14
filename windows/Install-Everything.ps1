@@ -1,7 +1,7 @@
 # Everything 1.4 stable and its PowerToys Run plugin, using upstream WinGet instructions.
 # https://github.com/lin-ycv/EverythingPowerToys/wiki
 [CmdletBinding()]
-param()
+param([string]$EverythingPath = '')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (Get-Process -Name PowerToys,PowerToys.Settings -ErrorAction SilentlyContinue) {
@@ -19,9 +19,10 @@ $uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
 & $uv run --no-project python (Join-Path $PSScriptRoot 'configure_everything.py') --settings (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys\PowerToys Run\settings.json') --manifest $manifest
 if ($LASTEXITCODE -ne 0) { throw 'Everything plugin validation/settings merge failed.' }
 
-$everything = (Get-Command Everything.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1)
-$exe = if ($everything) { $everything.Source } else { Join-Path $env:ProgramFiles 'Everything\Everything.exe' }
-if (-not (Test-Path -LiteralPath $exe)) { throw 'Everything.exe not found; start Everything manually and verify its installed location.' }
+. (Join-Path $PSScriptRoot 'Find-DesktopExecutable.ps1')
+$candidates = @((Join-Path $env:ProgramFiles 'Everything\Everything.exe'), (Join-Path $env:LOCALAPPDATA 'Everything\Everything.exe'))
+if (${env:ProgramFiles(x86)}) { $candidates += Join-Path ${env:ProgramFiles(x86)} 'Everything\Everything.exe' }
+$exe = Find-DesktopExecutable -Name 'Everything.exe' -Fallbacks $candidates -ExplicitPath $EverythingPath
 # Official options; no indexing filters or user preferences are replaced.
 # https://www.voidtools.com/support/everything/command_line_options/
 if (-not (Get-Service -Name Everything -ErrorAction SilentlyContinue)) {
