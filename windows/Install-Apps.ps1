@@ -54,7 +54,8 @@ function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = ''
         $actual = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
         if ($actual -ne $ExpectedSha256) { throw "SHA-256 mismatch for $Name" }
     }
-    Write-Host "Starting $Name. Complete any installer prompts."
+    Write-Host "Starting $Name. Complete any installer prompts. Uncheck Launch at the end if offered."
+    Write-Host 'Setup waits for the installer and its child processes. If the installed app opens and setup keeps waiting, close that app to continue.'
     $p = Start-Process -FilePath $file -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw "$Name exited with code $($p.ExitCode); check the installer result before rerunning." }
     if (-not ((Test-DirectAppInstalled $DisplayNamePattern) -or ($SignalRgb -and (Test-SignalRgbInstalled)))) {
@@ -110,3 +111,4 @@ if (Test-DirectAppInstalled '^ArtCraft(?:$|\s)') {
     Run-Installer $assets[0].browser_download_url $assets[0].name -DisplayNamePattern '^ArtCraft(?:$|\s)'
 }
 Write-Host 'Application installer stage finished.'
+
