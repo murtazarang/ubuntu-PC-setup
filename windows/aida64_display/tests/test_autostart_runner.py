@@ -17,7 +17,11 @@ class RunnerTests(unittest.TestCase):
             runner.write_text(code)
             (base / 'panel.py').write_text(
                 'import sys\nassert sys.argv[1:] == ["--rotation", "270"]\nprint("panel started")\n')
-            result = subprocess.run([sys.executable, str(runner), '--rotation', '270'], capture_output=True)
+            # Emulate pythonw's missing standard streams before importing the helper.
+            bootstrap = ('import sys,runpy; sys.stdout=sys.stderr=sys.stdin=None; '
+                         'sys.argv=[sys.argv[1], "--rotation", "270"]; '
+                         'runpy.run_path(sys.argv[0], run_name="__main__")')
+            result = subprocess.run([sys.executable, '-c', bootstrap, str(runner)], capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('panel started', (base / 'autostart.log').read_text())
             (base / 'panel.py').write_text('raise RuntimeError("sensor failure")\n')
