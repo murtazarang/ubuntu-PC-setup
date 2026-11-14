@@ -1,0 +1,25 @@
+name: AX206 launcher branch checks
+on:
+  push:
+    branches: [fix/ax206-entrypoint]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse scripts
+        shell: pwsh
+        run: |
+          Get-ChildItem windows/aida64_display -Filter *.ps1 -Recurse | ForEach-Object {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
+      - name: Test launcher on Windows PowerShell
+        shell: powershell
+        run: ./windows/aida64_display/tests/test-launcher.ps1
+      - name: Test launcher on PowerShell 7
+        shell: pwsh
+        run: ./windows/aida64_display/tests/test-launcher.ps1
