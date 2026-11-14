@@ -1,4 +1,5 @@
-# Safe: only executes the marked readback block; no endpoint, installer or config writes.
+# Safe: executes marked update/readback blocks with mocked OMP reads/writes.
+# No endpoint, installer or real configuration writes.
 [CmdletBinding()]
 param([string]$Source = (Join-Path $PSScriptRoot 'Connect-LocalModel.ps1'))
 Set-StrictMode -Version Latest
@@ -21,11 +22,12 @@ function Invoke-MockOmp {
         'override' { '{"value":{"default":"existing-provider/existing-model"}}' }
         'missing' { '{"value":{}}' }
         'malformed' { 'not-json' }
+        'array' { '[{"value":{"default":"local-inference/desired"}}]' }
         'exit' { $global:LASTEXITCODE = 9; '{}' }
         default { throw 'Unknown fixture' }
     }
 }
-foreach ($mode in @('match','override','missing','malformed','exit')) {
+foreach ($mode in @('match','override','missing','malformed','array','exit')) {
     $fixture.Mode = $mode
     $fixture.Calls = 0
     $messages = @(& $block 3>&1 6>&1)
@@ -49,7 +51,7 @@ foreach ($mode in @('match','override','missing','malformed','exit')) {
     }
 }
 $global:LASTEXITCODE = 0
-Write-Host 'Effective-model readback: five safe cases passed.'
+Write-Host 'Effective-model readback: six safe cases passed.'
 
 # Verify global writes never copy project-only effective roles into global settings.
 $globalMatch = [regex]::Match($text, '(?s)# BEGIN global-model update.*?\r?\n(.*?)# END global-model update')
@@ -81,6 +83,7 @@ $cases = @(
     @{ Name='entry-invalid'; Json='{"modelRoles":null}'; Fail=$true },
     @{ Name='json-invalid'; Json='not-json'; Fail=$true },
     @{ Name='root-invalid'; Json='[]'; Fail=$true },
+    @{ Name='single-array-invalid'; Json='[{"modelRoles":{"value":{"default":"old/global"}}}]'; Fail=$true },
     @{ Name='exit-invalid'; Json='{}'; Fail=$true }
 )
 foreach ($case in $cases) {
@@ -102,7 +105,7 @@ foreach ($case in $cases) {
     }
 }
 $global:LASTEXITCODE = 0
-Write-Host 'Global-model preservation: eight safe cases passed.'
+Write-Host 'Global-model preservation: nine safe cases passed.'
 
 $globalFixture.Json = '{"modelRoles":{"value":{"default":"old/global","reviewer":"global/reviewer"}}}'
 $globalFixture.Exit = 0
