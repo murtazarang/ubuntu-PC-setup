@@ -6,6 +6,9 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Discover an existing Strata command before considering installation, including
+# PATH entries added by an earlier installation in another terminal.
+$env:Path = (@($env:Path, [Environment]::GetEnvironmentVariable('Path','User'), [Environment]::GetEnvironmentVariable('Path','Machine')) | Where-Object { $_ }) -join ';'
 # Upstream --no-start completes preparation before returning; downloading a 58 GB
 # model must not consume the endpoint startup timeout.
 function Assert-XeStrataIdle {
