@@ -32,14 +32,31 @@ if (-not $Stage) {
         default { throw 'Invalid stage choice; nothing was installed.' }
     }
 }
-$pwsh = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue
-if (-not $pwsh) {
+# WinGet installs MSIX by default in PowerShell 7.6 and later. Resolve both
+# MSI and the registered MSIX instead of assuming an MSI-only path.
+function Find-PowerShell7 {
+    $command = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command -and (Test-Path -LiteralPath $command.Source -PathType Leaf)) { return $command.Source }
+    $msi = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+    if (Test-Path -LiteralPath $msi -PathType Leaf) { return $msi }
+    if (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue) {
+        $packages = @(Get-AppxPackage -Name Microsoft.PowerShell -ErrorAction Stop | Sort-Object Version -Descending)
+        foreach ($package in $packages) {
+            if (-not $package.InstallLocation) { continue }
+            $exe = Join-Path $package.InstallLocation 'pwsh.exe'
+            if (Test-Path -LiteralPath $exe -PathType Leaf) { return $exe }
+        }
+    }
+    return $null
+}
+$candidate = Find-PowerShell7
+if (-not $candidate) {
     & winget.exe install --id Microsoft.PowerShell --exact --source winget --accept-source-agreements --accept-package-agreements --no-upgrade --disable-interactivity
     $code = '0x{0:X8}' -f ([long]$LASTEXITCODE -band 0xFFFFFFFFL)
     if ($code -notin @('0x00000000','0x8A150061','0x8A15010D')) { throw "PowerShell 7 installation failed ($code)." }
-    $candidate = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
-} else { $candidate = $pwsh.Source }
-if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw 'PowerShell 7 was not found; reopen the terminal and retry.' }
+    $candidate = Find-PowerShell7
+}
+if (-not $candidate) { throw 'PowerShell 7 was not located after installation. Open PowerShell 7 from the Start menu as administrator and retry; if it is missing, check the WinGet installation output.' }
 $dir = Join-Path $env:LOCALAPPDATA ('PC-Setup\Runs\' + [guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $dir | Out-Null
 try {
