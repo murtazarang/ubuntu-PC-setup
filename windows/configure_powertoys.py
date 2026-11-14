@@ -3,7 +3,7 @@
 
 Schema: microsoft/PowerToys src/settings-ui/Settings.UI.Library/
 GeneralSettings.cs, EnabledModules.cs, PowerLauncherProperties.cs.
-PowerLauncher is explicitly excluded from PowerToys DSC SettingsResource.
+This targeted JSON merge does not depend on a particular DSC implementation.
 """
 import argparse
 import copy
