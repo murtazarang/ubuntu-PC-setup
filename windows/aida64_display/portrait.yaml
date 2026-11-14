@@ -1,0 +1,82 @@
+# Adapted from mechcow/win-ax206-display themes/default.yaml
+# Source revision 11280756789f1d61b80b49383b255acde62a9c60; GPL-2.0-or-later.
+name: Default dark portrait
+size: [320, 480]
+background: "#0d1117"
+defaults:
+  font: "Segoe UI"
+  font_size: 22
+  color: "#e6edf3"
+widgets:
+  - type: text
+    pos: [160, 12]
+    text: "%H:%M:%S"
+    font_size: 30
+    anchor: "ma"
+  - type: gauge
+    pos: [18, 60]
+    size: 134
+    sensor: cpu.temp
+    min: 30
+    max: 100
+    color: "#3fb950"
+    format: "{:.0f}°C"
+    font_size: 32
+  - type: text
+    pos: [178, 76]
+    text: "CPU"
+    font_size: 28
+  - type: text
+    pos: [178, 118]
+    sensor: cpu.load
+    format: "{:.0f}%"
+    font_size: 30
+  - type: text
+    pos: [178, 156]
+    text: "load"
+    color: "#8b949e"
+    font_size: 20
+  - type: gauge
+    pos: [18, 213]
+    size: 134
+    sensor: gpu.temp
+    min: 30
+    max: 100
+    color: "#f0883e"
+    format: "{:.0f}°C"
+    font_size: 32
+  - type: text
+    pos: [178, 229]
+    text: "GPU"
+    font_size: 28
+  - type: text
+    pos: [178, 271]
+    sensor: gpu.load
+    format: "{:.0f}%"
+    font_size: 30
+  - type: text
+    pos: [178, 309]
+    text: "load"
+    color: "#8b949e"
+    font_size: 20
+  - type: text
+    pos: [20, 378]
+    text: "RAM"
+    color: "#58a6ff"
+    font_size: 24
+  - type: text
+    pos: [208, 378]
+    sensor: ram.percent
+    format: "{:.0f}%"
+    font_size: 24
+  - type: bar
+    pos: [20, 418]
+    size: [280, 18]
+    sensor: ram.percent
+    color: "#58a6ff"
+  - type: text
+    pos: [160, 455]
+    text: "CPU / GPU temperatures in °C"
+    font_size: 16
+    color: "#8b949e"
+    anchor: "mm"
