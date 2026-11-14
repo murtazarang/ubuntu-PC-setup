@@ -13,7 +13,24 @@ function Install-WingetApp([string]$Id) {
     # APPINSTALLER_CLI_ERROR_INSTALL_ALREADY_INSTALLED
     if ($code -notin @('0x00000000', '0x8A150061', '0x8A15010D')) { throw "winget $Id failed, exit code $code" }
 }
-function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '') {
+function Test-DirectAppInstalled([string]$DisplayNamePattern) {
+    # Apps & Features registration is the Windows installer contract. Do not
+    # replace an older/newer registered version merely to match today's setup.
+    foreach ($key in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                       'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                       'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')) {
+        foreach ($entry in @(Get-ItemProperty -Path $key -ErrorAction SilentlyContinue)) {
+            if ($entry.PSObject.Properties['DisplayName'] -and $entry.DisplayName -match $DisplayNamePattern) { return $true }
+        }
+    }
+    return $false
+}
+function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '', [string]$DisplayNamePattern) {
+    if (-not $DisplayNamePattern) { throw 'An application detection pattern is required.' }
+    if (Test-DirectAppInstalled $DisplayNamePattern) {
+        Write-Host "$Name application already registered; preserving the installed version."
+        return
+    }
     $folder = Join-Path $env:TEMP 'UbuntuPCSetup-Windows'
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
     $file = Join-Path $folder $Name
@@ -25,7 +42,10 @@ function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = ''
     }
     Write-Host "Starting $Name. Complete any installer prompts."
     $p = Start-Process -FilePath $file -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "$Name exited with code $($p.ExitCode)" }
+    if ($p.ExitCode -ne 0) { throw "$Name exited with code $($p.ExitCode); check the installer result before rerunning." }
+    if (-not (Test-DirectAppInstalled $DisplayNamePattern)) {
+        throw "$Name returned but no matching installation is registered. Complete any remaining installer prompts before retrying."
+    }
 }
 function Test-SpotifyInstalled {
     # Preserve either an existing Win32 installation or the user's Store package.
@@ -63,13 +83,17 @@ $packages = @(
 foreach ($app in $packages) { Install-WingetApp $app }
 Install-Spotify
 # Pin the user's selected Paseo beta and the official Windows asset.
-Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-Setup-0.16.0-beta.2-x64.exe' 'Paseo-Setup-0.16.0-beta.2-x64.exe' 'd957b0b9978ef9283f6b794f0cd950563fc849b6f00266bea709fba903ed442f'
+Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-Setup-0.16.0-beta.2-x64.exe' 'Paseo-Setup-0.16.0-beta.2-x64.exe' 'd957b0b9978ef9283f6b794f0cd950563fc849b6f00266bea709fba903ed442f' -DisplayNamePattern '^Paseo(?:$|\s)' 
 # These are the exact installers supplied by the user, not substituted versions.
-Run-Installer 'https://github.com/Rem0o/FanControl.Releases/releases/download/V285/FanControl_285_net_4_8_Installer.exe' 'FanControl_285_net_4_8_Installer.exe'
-Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe'
+Run-Installer 'https://github.com/Rem0o/FanControl.Releases/releases/download/V285/FanControl_285_net_4_8_Installer.exe' 'FanControl_285_net_4_8_Installer.exe' -DisplayNamePattern '^Fan ?Control(?:$|\s)'
+Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe' -DisplayNamePattern '^SignalRGB(?:$|\s)'
 # Install ArtCraft Studio using the publisher's current Windows x64 installer.
-$release = Invoke-RestMethod -Uri 'https://api.github.com/repos/storytold/artcraft/releases/latest'
-$assets = @($release.assets | Where-Object { $_.name -match '^ArtCraft_.*_x64-setup\.exe$' })
-if ($assets.Count -ne 1) { throw 'Could not uniquely identify the official ArtCraft Studio Windows installer.' }
-Run-Installer $assets[0].browser_download_url $assets[0].name
+if (Test-DirectAppInstalled '^ArtCraft(?:$|\s)') {
+    Write-Host 'ArtCraft is already registered; preserving the installed version.'
+} else {
+    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/storytold/artcraft/releases/latest'
+    $assets = @($release.assets | Where-Object { $_.name -match '^ArtCraft_.*_x64-setup\.exe$' })
+    if ($assets.Count -ne 1) { throw 'Could not uniquely identify the official ArtCraft Studio Windows installer.' }
+    Run-Installer $assets[0].browser_download_url $assets[0].name -DisplayNamePattern '^ArtCraft(?:$|\s)'
+}
 Write-Host 'Application installer stage finished.'
