@@ -42,6 +42,36 @@ def save(path, data):
             os.unlink(temp)
 
 
+def load_config(agent_dir):
+    """Follow OMP's YAML precedence without hiding a legacy JSON config."""
+    yml = agent_dir / "models.yml"
+    alternate = agent_dir / "models.yaml"
+    legacy = agent_dir / "models.json"
+    path = yml if yml.exists() or not alternate.exists() else alternate
+    if path.exists():
+        data = yaml.safe_load(path.read_text(encoding="utf-8-sig"))
+        data = {} if data is None else data
+    elif legacy.exists():
+        # OMP migrates JSON only while both YAML files are absent. Preserve its
+        # providers before creating YAML; leave the original JSON untouched.
+        data = json.loads(legacy.read_text(encoding="utf-8-sig"))
+    else:
+        data = {}
+    if not isinstance(data, dict):
+        raise ValueError("Existing model configuration must be a mapping")
+    return path, data
+
+
+def model_id_from_response(body):
+    if not isinstance(body, dict) or not isinstance(body.get("data"), list) or not body["data"]:
+        raise ValueError("Local endpoint did not return any models")
+    first = body["data"][0]
+    model = first.get("id") if isinstance(first, dict) else None
+    if not isinstance(model, str) or not model.strip() or any(c in model for c in "\r\n"):
+        raise ValueError("Local endpoint did not return a valid model ID")
+    return model
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--agent-dir", required=True, type=Path)
@@ -49,14 +79,9 @@ def main():
     args = p.parse_args()
     with urllib.request.urlopen(f"http://127.0.0.1:{args.port}/v1/models", timeout=10) as r:
         body = json.load(r)
-    model = body["data"][0]["id"]
-    if not isinstance(model, str) or not model.strip() or "\n" in model:
-        raise ValueError("Local endpoint did not return a valid model ID")
-    path = args.agent_dir / "models.yml"
-    if not path.exists() and (args.agent_dir / "models.yaml").exists():
-        path = args.agent_dir / "models.yaml"
-    data = yaml.safe_load(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
-    save(path, merge(data or {}, model, args.port))
+    model = model_id_from_response(body)
+    path, data = load_config(args.agent_dir)
+    save(path, merge(data, model, args.port))
     print("local-inference/" + model)
 
 
