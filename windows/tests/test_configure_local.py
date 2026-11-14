@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 
 P = Path(__file__).resolve().parents[1] / 'configure_local.py'
@@ -42,6 +44,22 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(data['agents']['providers']['other']['enabled'])
         with self.assertRaises(ValueError):
             m.merge_paseo(data, 'C:/different.exe')
+
+    def test_cli_conflict_preserves_both_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            agent = root / 'agent'
+            agent.mkdir()
+            mcp = agent / 'mcp.json'
+            paseo = root / 'paseo.json'
+            mcp.write_text('{"mcpServers": {"custom": {"command": "keep"}}}\n')
+            paseo.write_text('{"agents":{"providers":{"omp":{"command":["custom"]}}}}\n')
+            before = (mcp.read_bytes(), paseo.read_bytes())
+            result = subprocess.run([sys.executable, str(P), '--agent-dir', str(agent),
+                                     '--paseo-config', str(paseo), '--bridge', 'bridge.exe',
+                                     '--omp', 'omp.exe', '--zim-dir', 'wiki'], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual((mcp.read_bytes(), paseo.read_bytes()), before)
 
     def test_atomic_output(self):
         with tempfile.TemporaryDirectory() as d:
