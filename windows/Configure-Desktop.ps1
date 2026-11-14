@@ -1,6 +1,6 @@
 # Configure native Windows equivalents to the requested GNOME utilities.
 [CmdletBinding()]
-param()
+param([string]$PowerToysPath = '', [string]$EverythingPath = '')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $registry = 'HKCU:\Software\Microsoft\Clipboard'
@@ -11,8 +11,9 @@ $candidates = @(
     (Join-Path $env:ProgramFiles 'PowerToys\PowerToys.exe'),
     (Join-Path $env:LOCALAPPDATA 'PowerToys\PowerToys.exe')
 )
-$runner = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $runner) { throw 'PowerToys not found; install it and retry.' }
+if (${env:ProgramFiles(x86)}) { $candidates += Join-Path ${env:ProgramFiles(x86)} 'PowerToys\PowerToys.exe' }
+. (Join-Path $PSScriptRoot 'Find-DesktopExecutable.ps1')
+$runner = Find-DesktopExecutable -Name 'PowerToys.exe' -Fallbacks $candidates -ExplicitPath $PowerToysPath
 $settings = Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys'
 # Let PowerToys write its own complete defaults before making a targeted merge.
 if (-not (Test-Path -LiteralPath (Join-Path $settings 'settings.json'))) {
@@ -25,12 +26,12 @@ if (Get-Process -Name PowerToys,PowerToys.Settings -ErrorAction SilentlyContinue
 if (Get-Process -Name PowerToys,PowerToys.Settings -ErrorAction SilentlyContinue) {
     throw 'PowerToys is still running; settings were not changed.'
 }
-# PowerLauncher is NOT a supported DSC resource. Merge its source-defined JSON
-# instead, retaining existing plugin configuration and all unrelated settings.
+# Merge source-defined JSON to retain existing plugin configuration and all
+# unrelated settings; this path does not require enabling DSC.
 $uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
 & $uv run --no-project python (Join-Path $PSScriptRoot 'configure_powertoys.py') $settings
 if ($LASTEXITCODE -ne 0) { throw 'PowerToys settings merge failed.' }
-& (Join-Path $PSScriptRoot 'Install-Everything.ps1')
+& (Join-Path $PSScriptRoot 'Install-Everything.ps1') -EverythingPath $EverythingPath
 Start-Process -FilePath $runner
 Write-Host 'Configured clipboard history (Win+V), PowerToys Run (Win+F2), and the Awake tray utility.'
 Write-Host 'Awake is enabled; select a keep-awake duration from its tray menu when needed.'
