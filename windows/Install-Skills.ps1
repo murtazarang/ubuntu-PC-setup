@@ -81,7 +81,7 @@ if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to locate Oh My Pi a
 New-Item -ItemType Directory -Force -Path $agentDir | Out-Null
 $rules = Join-Path $agentDir 'RULES.md'
 $tag = '<!-- ubuntu-pc-setup-local-ai -->'
-$prior = if (Test-Path -LiteralPath $rules) { Get-Content -LiteralPath $rules -Raw } else { '' }
+$prior = if (Test-Path -LiteralPath $rules) { [string](Get-Content -LiteralPath $rules -Raw) } else { '' }
 if (-not $prior.Contains($tag)) {
     $block = @'
 
