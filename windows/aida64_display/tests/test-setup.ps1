@@ -76,6 +76,7 @@ try {
     }
     Assert-True $failed 'Missing uv did not produce expected failure.'
     Assert-True (-not (Test-Path -LiteralPath $absent)) 'Setup mutated install path before checking uv.'
+    $global:LASTEXITCODE = 0
     Write-Host 'PASS: rerun, preserved theme, path with spaces, missing DLL refetch, uv failure and missing uv.'
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
