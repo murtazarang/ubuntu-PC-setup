@@ -45,6 +45,32 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\AX206
 ```
 This saves `%LOCALAPPDATA%\AX206Panel\preview.png` using **synthetic demonstration readings**, not live temperatures. You can edit `%LOCALAPPDATA%\AX206Panel\portrait.yaml`; rerunning Setup preserves that theme. Restart the panel after editing. `-InstallDir` is supported on both scripts; use the same path for each.
 
+## Optional: start automatically after Windows sign-in
+
+Once the display works, open **PowerShell as administrator under the same Windows account** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/autostart.ps1 | iex
+```
+
+This registers a Task Scheduler task for your account at sign-in, using the existing installation and portrait rotation 270. It runs without an open terminal, with elevated privileges for sensor access, and saves no password. It does **not** start another copy now or interrupt your current display. After your next sign-in, do not also launch `Run.ps1`. USB drivers and PawnIO are untouched.
+
+Status:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/autostart.ps1))) -Action Status
+```
+
+Remove automatic startup (administrator PowerShell):
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/autostart.ps1))) -Action Remove
+```
+
+Removal only unregisters this task; it does not terminate a running display or delete installation files. If startup fails, inspect `%LOCALAPPDATA%\AX206Panel\autostart.log`. The log keeps one previous copy when it grows beyond 2 MB at startup. The USB display must be connected at sign-in; automatic USB reconnection is not implemented. The task runs while this user is signed in, not before login. Signing in as a different administrator registers that administrator's task instead, so use your normal account.
+
+Task Scheduler details: [sign-in trigger](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasktrigger), [interactive elevated principal](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal), [no time limit and IgnoreNew](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset). The `pythonw.exe` process avoids a console window; stdout and errors are redirected before running the panel.
+
 ## USB driver, only if Info cannot open the display
 
 Follow [upstream's driver instructions](https://github.com/mechcow/win-ax206-display/blob/11280756789f1d61b80b49383b255acde62a9c60/README.md). An existing working AX206/libusb-win32 driver needs no replacement. If a driver is missing, use [official Zadig](https://zadig.akeo.ie/), select only the display with ID **1908:0102**, and select **libusb-win32** as recommended upstream for AIDA64 compatibility. Do not replace a keyboard, mouse or unrelated USB device's driver. Driver changes remain manual. Do not disable security software or download the seller's unknown archive. A missing `libusb0.dll` is a separate backend availability error; follow the upstream backend instructions rather than copying arbitrary DLLs into Windows system folders.
