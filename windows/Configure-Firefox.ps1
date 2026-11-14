@@ -28,6 +28,10 @@ if (${env:ProgramFiles(x86)}) { $candidates += Join-Path ${env:ProgramFiles(x86)
 $candidates += Join-Path $env:LOCALAPPDATA 'Mozilla Firefox\firefox.exe'
 $firefox = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
 if (-not $firefox) { throw 'Firefox not found in registered or standard installation locations.' }
+# Microsoft Store/MSIX package files are read-only, including for administrators.
+if (($firefox -split '[\\/]') -contains 'WindowsApps') {
+    throw 'The discovered Firefox is a protected Microsoft Store package. No policies were changed. This JSON-policy setup requires the Mozilla desktop build; do not change WindowsApps permissions.'
+}
 $policy = Join-Path (Split-Path $firefox) 'distribution\policies.json'
 $argsList = @('run','--no-project','python',(Join-Path $PSScriptRoot 'apply_firefox_policy.py'),$policy,'--profiles',(Join-Path $env:APPDATA 'Mozilla\Firefox\profiles.ini'))
 if ($Release) { $argsList += '--release' }
@@ -36,3 +40,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Firefox policy merge failed. Check permissions
 if (-not $Release) {
     Write-Host 'Start Firefox once and allow extensions to initialize, then run this script with -Release to preserve later uBlock filter edits.'
 } else { Write-Host 'Released initial uBlock filter settings; other policies remain.' }
+
