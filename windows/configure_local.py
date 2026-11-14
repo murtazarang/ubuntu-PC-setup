@@ -33,14 +33,16 @@ def atomic_json(path, data):
             os.unlink(temp)
 
 
-def merge_mcp(data, uvx, zim_dir):
+def merge_mcp(data, bridge, zim_dir, legacy_uvx=None):
     servers = data.setdefault("mcpServers", {})
     if not isinstance(servers, dict):
         raise ValueError("mcpServers must be an object")
-    entry = {"type": "stdio", "command": str(uvx),
-             "args": ["--offline", "openzim-mcp==3.4.0", str(zim_dir)]}
+    entry = {"type": "stdio", "command": str(bridge),
+             "args": [str(zim_dir)]}
     existing = servers.get("openzim")
-    if existing is not None and existing != entry:
+    legacy = {"type": "stdio", "command": str(legacy_uvx),
+              "args": ["--offline", "openzim-mcp==3.4.0", str(zim_dir)]}
+    if existing is not None and existing != entry and not (legacy_uvx and existing == legacy):
         raise ValueError("An openzim entry already exists and differs; no changes made")
     servers["openzim"] = entry
     return data
@@ -64,13 +66,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent-dir", required=True, type=Path)
     parser.add_argument("--paseo-config", required=True, type=Path)
-    parser.add_argument("--uvx", required=True, type=Path)
+    parser.add_argument("--bridge", required=True, type=Path)
+    parser.add_argument("--legacy-uvx", type=Path)
     parser.add_argument("--omp", required=True, type=Path)
     parser.add_argument("--zim-dir", required=True, type=Path)
     args = parser.parse_args()
     # Validate both merges before writing either file.
     mcp_path = args.agent_dir / "mcp.json"
-    mcp = merge_mcp(read_map(mcp_path), args.uvx, args.zim_dir)
+    mcp = merge_mcp(read_map(mcp_path), args.bridge, args.zim_dir, args.legacy_uvx)
     paseo = merge_paseo(read_map(args.paseo_config), args.omp)
     atomic_json(mcp_path, mcp)
     atomic_json(args.paseo_config, paseo)
