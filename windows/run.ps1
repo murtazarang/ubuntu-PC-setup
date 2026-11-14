@@ -40,7 +40,7 @@ if (-not $pwsh) {
     $candidate = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
 } else { $candidate = $pwsh.Source }
 if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw 'PowerShell 7 was not found; reopen the terminal and retry.' }
-$dir = Join-Path $env:TEMP ('pc-setup-' + [guid]::NewGuid().ToString())
+$dir = Join-Path $env:LOCALAPPDATA ('PC-Setup\Runs\' + [guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $dir | Out-Null
 try {
     $archive = Join-Path $dir 'setup.zip'
@@ -49,10 +49,11 @@ try {
     Expand-Archive -LiteralPath $archive -DestinationPath $unpacked
     $setup = Join-Path $unpacked 'ubuntu-PC-setup-main\windows\Setup.ps1'
     if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Downloaded archive does not contain Windows setup.' }
+    Write-Host "Setup files and recovery helpers are saved at: $(Split-Path -Parent $setup)"
     & $candidate -NoProfile -ExecutionPolicy Bypass -File $setup -Stage $stage -Hardware $hardware
     if ($LASTEXITCODE -ne 0) { throw "Setup did not complete (exit $LASTEXITCODE); review its output before retrying." }
 } finally {
-    Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Setup files remain at: $dir"
 }
 
 } @args
