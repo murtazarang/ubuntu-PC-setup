@@ -28,6 +28,16 @@ jobs:
       - name: Test PowerShell discovery in PowerShell 7
         shell: pwsh
         run: ./windows/test-pwsh-resolution.ps1
+      - name: Test PowerShell candidate and arguments (5.1)
+        shell: powershell
+        run: |
+          ./windows/test-pwsh-candidate.ps1
+          ./windows/test-launcher-arguments.ps1
+      - name: Test PowerShell candidate and arguments (7)
+        shell: pwsh
+        run: |
+          ./windows/test-pwsh-candidate.ps1
+          ./windows/test-launcher-arguments.ps1
       - name: Execute mocked update tests
         shell: pwsh
         run: ./windows/tests/test-updates.ps1
