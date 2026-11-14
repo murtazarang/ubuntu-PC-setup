@@ -30,6 +30,7 @@ if (Get-Process -Name PowerToys,PowerToys.Settings -ErrorAction SilentlyContinue
 $uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
 & $uv run --no-project python (Join-Path $PSScriptRoot 'configure_powertoys.py') $settings
 if ($LASTEXITCODE -ne 0) { throw 'PowerToys settings merge failed.' }
+& (Join-Path $PSScriptRoot 'Install-Everything.ps1')
 Start-Process -FilePath $runner
 Write-Host 'Configured clipboard history (Win+V), PowerToys Run (Win+F2), and the Awake tray utility.'
 Write-Host 'Awake is enabled; select a keep-awake duration from its tray menu when needed.'
