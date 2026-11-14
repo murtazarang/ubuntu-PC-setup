@@ -130,3 +130,7 @@ Existing OMP disabledServers configuration can still disable openzim. The helper
 New test-ai-regressions.ps1 extracts production AST fragments and tests an existing empty/nonempty RULES.md, retention of process-only PATH in both scripts, successful installer simulation leaving native exit17, and throwing installer simulation. It uses only temporary files and mocks; it has NOT been run in this workspace because pwsh is absent. It does not download or execute vendor software.
 
 Still needed: Windows CI execution of that test; consistent OMP executable regression; partial archive corruption checks; offline OpenZIM startup/query against a small known archive; actual Windows paths with spaces/non-ASCII; interrupted XeStrata recovery; real model identity, completion and tool-calling verification. No full installation or hardware success is claimed.
+
+## Windows CI correction
+
+Run 43602320577 exposed that casting inside the conditional branch did not normalize the assigned empty-file result. The cast now wraps the entire conditional subexpression, so the final assignment always receives a string. The existing empty/nonempty source-fragment regression is retained unchanged; this correction still requires its next Windows CI execution.
