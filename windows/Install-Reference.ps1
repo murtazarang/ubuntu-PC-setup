@@ -16,7 +16,8 @@ New-Item -ItemType Directory -Force -Path $ArchiveDirectory | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP installation failed.' }
 $agentDir = (& $omp config path | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to find OMP configuration directory.' }
-$paseoConfig = Join-Path $env:USERPROFILE '.paseo\config.json'
+$paseoHome = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE '.paseo' }
+$paseoConfig = Join-Path $paseoHome 'config.json'
 & $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --paseo-config $paseoConfig --uvx $uvx --omp $omp --zim-dir $ArchiveDirectory
 if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP and Paseo.' }
 
