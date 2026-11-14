@@ -16,6 +16,8 @@ function New-ScheduledTaskSettingsSet {
 }
 function Register-ScheduledTask {
  param($TaskName,$TaskPath,$Description,$Action,$Trigger,$Principal,$Settings)
+ if ($Trigger.UserId -ne $Principal.UserId) { throw 'Trigger/principal identity mismatch' }
+ if ($Action.Arguments -ne ('"' + (Join-Path $Action.WorkingDirectory 'autostart_runner.py') + '" --rotation 270')) { throw 'Wrong quoted action arguments' }
  $global:AxRegistered++
  $global:AxTask = [pscustomobject]@{TaskName=$TaskName;Description=$Description;Actions=@($Action);Principal=$Principal;State='Ready'}
 }
