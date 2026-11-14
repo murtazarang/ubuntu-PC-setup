@@ -40,7 +40,7 @@ not disabled.
 
 The installed applications include Steam, Firefox, Stremio,
 Spotify, VS Code, PowerToys, ArtCraft Studio, the selected Paseo beta, the
-exact FanControl V285 installer and the supplied SignalRGB installer. These
+supplied SignalRGB installer. These
 installers may display their own prompts. Steam games use native Windows
 graphics APIs; no Proton is needed. PowerToys Run targets Win+F2, PowerToys
 Awake provides an on-demand keep-awake switch, and Windows clipboard history
@@ -65,7 +65,7 @@ Verify the correct GPU driver and reboot, `nvidia-smi` on NVIDIA, Windows GPU
 driver status on Intel, both 3060s on the dual system, then start the local model.
 Confirm its `/v1/models` endpoint and run a tool-using test in both Oh My Pi and
 Paseo. Verify OpenZIM search and source retrieval offline, plus all Firefox
-extensions and settings, Win+F2, Win+V, Awake, FanControl, SignalRGB and Steam.
+extensions and settings, Win+F2, Win+V, Awake, SignalRGB and Steam.
 None of these hardware, GUI, installer, archive download, or end-to-end AI tests
 has been run by the author of these scripts.
 
