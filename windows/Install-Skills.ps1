@@ -4,6 +4,7 @@
 param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$omp = (Get-Command omp.exe -CommandType Application -ErrorAction Stop).Source
 $root = Join-Path $env:LOCALAPPDATA 'OMP-Skills'
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 
@@ -44,20 +45,20 @@ $roots = @((Join-Path $science 'skills'), (Join-Path $writer 'skills'),
 foreach ($path in $roots) {
     if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "Missing skills directory $path" }
 }
-$state = (& omp config get skills.customDirectories --json | Out-String | ConvertFrom-Json)
+$state = (& $omp config get skills.customDirectories --json | Out-String | ConvertFrom-Json)
 if ($LASTEXITCODE -ne 0) { throw 'Could not read Oh My Pi skills configuration' }
 $existing = @($state.value)
 $combined = @($existing + $roots | Select-Object -Unique)
 # PowerShell's native argument marshalling differs by version. Passing compact JSON as one argument
 # is required by omp; verify the final value below.
 $json = ConvertTo-Json -InputObject $combined -Compress
-& omp config set skills.customDirectories $json
+& $omp config set skills.customDirectories $json
 if ($LASTEXITCODE -ne 0) { throw 'Could not register skill directories' }
-& omp config set skills.enabled true
+& $omp config set skills.enabled true
 if ($LASTEXITCODE -ne 0) { throw 'Could not enable skills' }
-& omp config set skills.enableSkillCommands true
+& $omp config set skills.enableSkillCommands true
 if ($LASTEXITCODE -ne 0) { throw 'Could not enable skill commands' }
-$listed = (& omp skill list --json | Out-String | ConvertFrom-Json)
+$listed = (& $omp skill list --json | Out-String | ConvertFrom-Json)
 if ($LASTEXITCODE -ne 0) { throw 'Could not inspect Oh My Pi skill inventory' }
 $loaded = @{}
 foreach ($item in $listed.skills) {
@@ -76,12 +77,18 @@ if ($missing.Count -gt 0) {
     $missing | ForEach-Object { Write-Error "Skill not discovered: $_" -ErrorAction Continue }
     throw "Oh My Pi missed $($missing.Count) skill definitions"
 }
-$agentDir = (& omp config path | Out-String).Trim()
+$agentDir = (& $omp config path | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to locate Oh My Pi agent directory.' }
 New-Item -ItemType Directory -Force -Path $agentDir | Out-Null
 $rules = Join-Path $agentDir 'RULES.md'
 $tag = '<!-- ubuntu-pc-setup-local-ai -->'
-$prior = [string]$(if (Test-Path -LiteralPath $rules) { Get-Content -LiteralPath $rules -Raw } else { '' })
+# BEGIN existing-rules initialization (also exercised by safe regression tests)
+$prior = ''
+if (Test-Path -LiteralPath $rules) {
+    $prior = [IO.File]::ReadAllText($rules)
+}
+if ($null -eq $prior) { $prior = '' }
+# END existing-rules initialization
 if (-not $prior.Contains($tag)) {
     $block = @'
 
