@@ -10,6 +10,9 @@ if ($systemInfo.RebootRequired) {
 $session = New-Object -ComObject Microsoft.Update.Session
 $search = $session.CreateUpdateSearcher()
 $result = $search.Search("IsInstalled=0 and IsHidden=0 and Type='Software'")
+if ($result.ResultCode -ne 2) {
+    throw "Windows Update search did not fully succeed (code $($result.ResultCode)). Open Windows Update, finish or retry its scan, then rerun the Drivers stage."
+}
 $updates = New-Object -ComObject Microsoft.Update.UpdateColl
 $manual = @()
 foreach ($update in $result.Updates) {
@@ -33,6 +36,12 @@ if ($updates.Count -gt 0) {
     if ($downloadResult.ResultCode -ne 2) { throw "Windows Update download did not fully succeed (code $($downloadResult.ResultCode))." }
     $installer = $session.CreateUpdateInstaller()
     $installer.Updates = $updates
+    if ($installer.IsBusy) {
+        throw 'Another Windows Update installation is in progress. Let it finish, then rerun the Drivers stage.'
+    }
+    if ($installer.RebootRequiredBeforeInstallation) {
+        throw 'Windows Update now requires a restart before installation. Restart and rerun the Drivers stage.'
+    }
     $result = $installer.Install()
     if ($result.ResultCode -ne 2) { throw "Windows Update installation did not fully succeed (code $($result.ResultCode)). Open Windows Update for details." }
     if ($result.RebootRequired) { throw 'Windows updates require a reboot. Restart and rerun the Drivers stage.' }
