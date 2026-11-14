@@ -25,9 +25,14 @@ function Test-DirectAppInstalled([string]$DisplayNamePattern) {
     }
     return $false
 }
-function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '', [string]$DisplayNamePattern) {
+# SignalRGB documents this per-user launcher as its installed executable.
+# https://docs.signalrgb.com/guides/installation-setup/file-locations/
+function Test-SignalRgbInstalled {
+    return Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'VortxEngine\SignalRgbLauncher.exe') -PathType Leaf
+}
+function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '', [string]$DisplayNamePattern, [switch]$SignalRgb) {
     if (-not $DisplayNamePattern) { throw 'An application detection pattern is required.' }
-    if (Test-DirectAppInstalled $DisplayNamePattern) {
+    if ((Test-DirectAppInstalled $DisplayNamePattern) -or ($SignalRgb -and (Test-SignalRgbInstalled))) {
         Write-Host "$Name application already registered; preserving the installed version."
         return
     }
@@ -43,7 +48,7 @@ function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = ''
     Write-Host "Starting $Name. Complete any installer prompts."
     $p = Start-Process -FilePath $file -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw "$Name exited with code $($p.ExitCode); check the installer result before rerunning." }
-    if (-not (Test-DirectAppInstalled $DisplayNamePattern)) {
+    if (-not ((Test-DirectAppInstalled $DisplayNamePattern) -or ($SignalRgb -and (Test-SignalRgbInstalled)))) {
         throw "$Name returned but no matching installation is registered. Complete any remaining installer prompts before retrying."
     }
 }
@@ -86,7 +91,7 @@ Install-Spotify
 Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-Setup-0.16.0-beta.2-x64.exe' 'Paseo-Setup-0.16.0-beta.2-x64.exe' 'd957b0b9978ef9283f6b794f0cd950563fc849b6f00266bea709fba903ed442f' -DisplayNamePattern '^Paseo(?:$|\s)' 
 # These are the exact installers supplied by the user, not substituted versions.
 Run-Installer 'https://github.com/Rem0o/FanControl.Releases/releases/download/V285/FanControl_285_net_4_8_Installer.exe' 'FanControl_285_net_4_8_Installer.exe' -DisplayNamePattern '^Fan ?Control(?:$|\s)'
-Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe' -DisplayNamePattern '^SignalRGB(?:$|\s)'
+Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe' -DisplayNamePattern '^SignalRGB(?:$|\s)' -SignalRgb
 # Install ArtCraft Studio using the publisher's current Windows x64 installer.
 if (Test-DirectAppInstalled '^ArtCraft(?:$|\s)') {
     Write-Host 'ArtCraft is already registered; preserving the installed version.'
