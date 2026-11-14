@@ -11,7 +11,10 @@ $isolated = $setup.Replace('& $uv.Source', 'Invoke-FakeUv').Replace('& $python '
 # Preserve the original script's asset root when executing the detached block.
 $script:Assets = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $isolated = $isolated.Replace('$PSScriptRoot', '$script:Assets')
+$isolated = $isolated.Replace("& (Join-Path `$script:Assets 'autostart.ps1')", 'Invoke-FakeAutostart')
 $script:Code = [scriptblock]::Create($isolated)
+$script:StartupCalls=0
+function Invoke-FakeAutostart { param($InstallDir,$Rotation) $script:StartupCalls++ }
 $script:Events = [System.Collections.Generic.List[string]]::new()
 $script:UvFails = $false
 $script:UvMissing = $false
@@ -53,6 +56,7 @@ try {
     Assert-True ($script:Events[0].Contains($install)) 'Custom install path was not passed as one preserved argument.'
     Assert-True ((Get-Content -LiteralPath (Join-Path $install 'portrait.yaml') -Raw).Trim() -eq 'CUSTOM THEME MUST SURVIVE') 'Custom theme was overwritten.'
     Assert-True (Test-Path -LiteralPath (Join-Path $install 'panel.py')) 'Runner not copied.'
+    Assert-True ($script:StartupCalls -eq 1) 'Setup did not register default startup.'
 
     $script:Events.Clear()
     Remove-Item -LiteralPath $script:Dll
@@ -81,3 +85,4 @@ try {
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
+
