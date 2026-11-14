@@ -75,7 +75,7 @@ All eleven package directory paths exist in Microsoft's manifest repository. Dir
 | Mozilla.Firefox | V directory manifests/m/Mozilla/Firefox | Locale/scope/Store versus Win32 existing-install interactions U. |
 | Valve.Steam | V 2.10.91.91 manifest: machine, NSIS, x86 installer, self-elevation, official Steam CDN | Actual client self-update/login/game compatibility not tested. |
 | Stremio.Stremio | V 4.4.181: user, NSIS, x86, silent modes, official dl.strem.io | Fresh-session install behavior not tested. |
-| Foundry376.Mailspring (removed at user's request) | V 1.26.2: user, exe, --silent manifest switches, official GitHub release | Account requirements and launched process behavior U. |
+| Foundry376.Mailspring | V 1.26.2: user, exe, --silent manifest switches, official GitHub release | Account requirements and launched process behavior U. |
 | Microsoft.VisualStudioCode | V directory | User/system installer selection U. |
 | Microsoft.PowerToys | V directory, upstream runner/settings source | Chosen version/location and plugin version compatibility U. |
 | 7zip.7zip | V directory | Selected installer/scope U. |
@@ -115,3 +115,16 @@ Python's json/pathlib/tempfile/os/shutil/subprocess/argparse interfaces below we
 - PowerToys initially missing/installed/running/custom location; actual Win+F2, Everything global/file query and restart persistence.
 - Firefox fresh and populated profiles, multiple Windows accounts/installations, release before/after extension startup, existing managed policy, custom profile location; confirm no unrelated filters lost.
 - Explicit reference-page validation for every generic PowerShell/Python built-in marked I and every vendor-specific unknown above. This remains outstanding; no claim of complete per-argument authoritative verification is made.
+
+## Follow-up corrections (2026-11-14)
+
+- Custom PowerToys/Everything discovery now checks PATH, registered App Paths default values, standard per-user/machine/x86 locations; component-specific `-PowerToysPath` / `-EverythingPath` handles nonregistered custom installs without guessing a disk location. Explicit paths must exist and use the expected executable filename. App Paths contract: https://learn.microsoft.com/en-us/windows/win32/shell/app-registration . Portable installs remain an explicit-path case; application version compatibility is not inferred.
+- Preserved `Start-Process -Wait -PassThru` rather than replacing it with a parent-process-only wait. Microsoft's documented behavior waits descendants: https://learn.microsoft.com/powershell/module/microsoft.powershell.management/start-process . The installer now tells the user to disable final auto-launch, or close an auto-launched app. This is an interactive installer contract, not a claim of unattended completion.
+- Firefox initialization now refuses on machines with another non-special Windows user profile. `Win32_UserProfile.Special` identifies system-service profiles and SID identifies ownership: https://learn.microsoft.com/en-us/previous-versions/windows/desktop/userprofileprov/win32-userprofile . This conservative guard avoids pretending current-user profiles.ini covers all users. It does **not** inventory arbitrary unregistered Firefox profile directories, ensure browser startup, or migrate existing personal uBlock settings. Use dashboard setup on multi-user machines; no policies are changed in that refusal path. Release-only remains supported. Mozilla installation policy location: https://support.mozilla.org/en-US/kb/customizing-firefox-using-policiesjson . Group Policy precedence and actual browser application remain untested.
+- Removed stale assertion that PowerLauncher lacks DSC support; retained narrow JSON merge implementation.
+
+## Independent desktop/Firefox follow-up review (2026-11-14)
+
+Compared the local discovery and Firefox scope changes with current GitHub main using the connected GitHub reader. Reopened Microsoft App Paths and Win32_UserProfile documentation, Mozilla policies.json installation documentation, voidtools command-line documentation and the EverythingPowerToys wiki. Confirmed App Paths uses the default value rather than `Path`, Firefox policy location is beside the selected EXE under `distribution`, and the proposed profile guard uses documented SID/Special properties. The guard is intentionally conservative, not an inventory of all Firefox profiles. Existing query failure propagates before policy writes; release bypass is deliberate.
+
+Reviewed the six-case desktop discovery fixture and four-case Firefox scope fixture by inspection, including mock scope and failure assertions. No Windows/PowerShell executable is available in this workspace, so neither fixture was executed here. All 27 existing Python tests passed locally. Real registry discovery, profile inventory, PowerToys/Everything startup and Firefox policy consumption still require Windows validation. Removed the remaining stale DSC exclusion assertion in configure_powertoys.py; no functional code change was required in this bounded independent pass. This is not a claim that every command in the full installer has been authoritatively verified.
