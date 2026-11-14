@@ -23,3 +23,14 @@ class InstallerPolicyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class LauncherTests(unittest.TestCase):
+    def test_launcher_fetches_archive_without_needing_git(self):
+        text = (ROOT / 'run.ps1').read_text(encoding='utf-8')
+        self.assertIn('archive/refs/heads/main.zip', text)
+        self.assertIn('NvidiaSingle', text)
+        self.assertIn('NvidiaDual', text)
+        self.assertIn('Intel', text)
+        self.assertIn("'Drivers'", text)
+        self.assertIn("'Desktop'", text)
+        self.assertNotIn('git clone', text)

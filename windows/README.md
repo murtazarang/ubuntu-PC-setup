@@ -5,6 +5,18 @@ not been run on Windows or on the specified GPUs. Do not treat the scripts as
 verified until tested. No disk partitioning, formatting, WSL, Btrfs or Timeshift
 is performed.
 
+## Short launcher
+
+Open Windows PowerShell as administrator, then enter:
+
+```powershell
+irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/run.ps1 | iex
+```
+
+The launcher asks which PC and stage, gets the required files automatically,
+and runs that stage. Run it again after the driver step and reboot, choosing
+Desktop. It needs internet and WinGet. This is still an unverified draft.
+
 ## Intended workflow
 
 Install Windows 11 and create the desired local account yourself. The third
@@ -57,7 +69,7 @@ extensions and settings, Win+F2, Win+V, Awake, FanControl, SignalRGB and Steam.
 None of these hardware, GUI, installer, archive download, or end-to-end AI tests
 has been run by the author of these scripts.
 
-The ten Python unit tests check configuration merges in isolation only:
+The eleven Python unit tests check configuration merges in isolation only:
 `python -m unittest discover -s windows/tests`. They do not exercise PowerShell,
 installers or actual Windows. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
 [OMP](https://github.com/can1357/oh-my-pi), [Strata](https://github.com/Niko1221/Strata),
