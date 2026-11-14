@@ -57,7 +57,7 @@ extensions and settings, Win+F2, Win+V, Awake, FanControl, SignalRGB and Steam.
 None of these hardware, GUI, installer, archive download, or end-to-end AI tests
 has been run by the author of these scripts.
 
-The eight Python unit tests check configuration merges in isolation only:
+The ten Python unit tests check configuration merges in isolation only:
 `python -m unittest discover -s windows/tests`. They do not exercise PowerShell,
 installers or actual Windows. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
 [OMP](https://github.com/can1357/oh-my-pi), [Strata](https://github.com/Niko1221/Strata),

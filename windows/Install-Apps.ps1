@@ -8,10 +8,10 @@ if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
 }
 function Install-WingetApp([string]$Id) {
     Write-Host "Installing $Id ..."
-    & winget.exe install --exact --id $Id --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
-    $code = [long]$LASTEXITCODE -band 0xffffffff
+    & winget.exe install --exact --id $Id --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity --no-upgrade
+    $code = '0x{0:X8}' -f ([long]$LASTEXITCODE -band 0xFFFFFFFFL)
     # APPINSTALLER_CLI_ERROR_INSTALL_ALREADY_INSTALLED
-    if ($code -ne 0 -and $code -ne 0x8A15002B) { throw "winget $Id failed, exit code $code" }
+    if ($code -notin @('0x00000000', '0x8A150061', '0x8A15010D')) { throw "winget $Id failed, exit code $code" }
 }
 function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '') {
     $folder = Join-Path $env:TEMP 'UbuntuPCSetup-Windows'
