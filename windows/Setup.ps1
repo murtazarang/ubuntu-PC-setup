@@ -17,7 +17,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 if ($Stage -eq 'Drivers') {
     & (Join-Path $PSScriptRoot 'Install-Updates.ps1')
     & (Join-Path $PSScriptRoot 'Install-Drivers.ps1') -Hardware $Hardware
-    Write-Host 'Reboot now, then run the Desktop stage.'
+    Write-Host 'Use the installed vendor app to install its recommended graphics driver, reboot, then run the Desktop stage.'
     return
 }
 

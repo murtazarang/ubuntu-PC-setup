@@ -17,9 +17,10 @@ that account, run `Bootstrap.ps1` to acquire PowerShell 7, and open **PowerShell
 - 2700X + two RTX 3060s: `NvidiaDual`
 
 Run `./Setup.ps1 -Stage Drivers -Hardware NvidiaSingle`, substituting the
-appropriate hardware name. The stage downloads the pinned vendor WHQL driver,
-checks its digest and opens its installer; complete the installer's prompts.
-Reboot, then run `./Setup.ps1 -Stage Desktop -Hardware NvidiaSingle` with the
+appropriate hardware name. The stage runs Windows Update and installs the NVIDIA
+App on NVIDIA machines or Intel Driver & Support Assistant on the Intel machine.
+Open the installed vendor app, install its recommended graphics driver, and
+reboot. The script does not install a pinned driver automatically. Then run `./Setup.ps1 -Stage Desktop -Hardware NvidiaSingle` with the
 same hardware selection. The desktop stage can take hours to download models
 and Wikipedia. NVIDIA uses IQ2_XS for one GPU or IQ3_XXS with both GPUs; Intel
 uses XeStrata Gyro-S. Model use remains local by default; hosted providers are
