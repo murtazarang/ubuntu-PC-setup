@@ -98,8 +98,7 @@ foreach ($app in $packages) { Install-WingetApp $app }
 Install-Spotify
 # Pin the user's selected Paseo beta and the official Windows asset.
 Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-Setup-0.16.0-beta.2-x64.exe' 'Paseo-Setup-0.16.0-beta.2-x64.exe' 'd957b0b9978ef9283f6b794f0cd950563fc849b6f00266bea709fba903ed442f' -DisplayNamePattern '^Paseo(?:$|\s)' 
-# These are the exact installers supplied by the user, not substituted versions.
-Run-Installer 'https://github.com/Rem0o/FanControl.Releases/releases/download/V285/FanControl_285_net_4_8_Installer.exe' 'FanControl_285_net_4_8_Installer.exe' -DisplayNamePattern '^Fan ?Control(?:$|\s)'
+# Use the exact SignalRGB installer supplied by the user.
 Run-Installer 'https://release.signalrgb.com/Install_SignalRgb.exe' 'Install_SignalRgb.exe' -DisplayNamePattern '^SignalRGB(?:$|\s)' -SignalRgb
 # Install ArtCraft Studio using the publisher's current Windows x64 installer.
 if (Test-DirectAppInstalled '^ArtCraft(?:$|\s)') {
