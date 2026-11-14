@@ -22,15 +22,50 @@ function Assert-XeStrataIdle {
         throw 'Port 8095 is already in use. This setup cannot verify the model there and will not modify or reuse that server.'
     }
 }
+# Upstream --describe reports installed model configs without entering setup.
+# https://github.com/MistVVK/XeStrata/blob/main/setup.py
+function Test-XeStrataNeedsPreparation {
+    param([Parameter(Mandatory=$true)][string]$Executable)
+    $raw = (& $Executable --describe | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect XeStrata model inventory; refusing to change an existing installation.' }
+    try { $inventory = $raw | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw 'XeStrata returned invalid model inventory; refusing to run setup.' }
+    if ($null -eq $inventory -or -not $inventory.PSObject.Properties['installed'] -or
+        $null -eq $inventory.installed -or $inventory.installed -isnot [System.Array]) {
+        throw 'XeStrata inventory has no valid installed-model array; refusing to run setup.'
+    }
+    $installed = @($inventory.installed)
+    if ($installed.Count -eq 0) { return $true }
+    # Without --setup/--model/--family, upstream starts its newest config.
+    # Only a single matching config is unambiguous; never rewrite another model
+    # or change a user's existing context/settings merely to rerun this script.
+    if ($installed.Count -ne 1) {
+        throw 'XeStrata has multiple saved models. Preserving all settings; start the intended Gyro-S model in XeStrata, then run Connect-LocalModel.ps1 -Port 8095 separately.'
+    }
+    $model = $installed[0]
+    foreach ($key in @('family','model_name','context','config')) {
+        if ($null -eq $model -or -not $model.PSObject.Properties[$key]) { throw 'XeStrata model inventory is incomplete; refusing to run setup.' }
+    }
+    if ($model.family -ne 'gyro' -or $model.model_name -ne 'qwen3.8-flash-next-gyro-gyro-s' -or $model.context -ne 32768 -or
+        [string]::IsNullOrWhiteSpace([string]$model.config)) {
+        throw 'XeStrata has an existing model or context different from this setup. Preserving it; manage the desired model in XeStrata and connect it separately.'
+    }
+    Write-Host 'Existing XeStrata Gyro-S configuration found; skipping model preparation and preserving its settings.'
+    return $false
+}
 function Start-XeStrataModel {
     param([Parameter(Mandatory=$true)][string]$Executable)
     Assert-XeStrataIdle
-    Write-Host 'Preparing XeStrata Gyro-S. The large download may take hours; progress appears below.'
-    & $Executable --setup --family gyro --model Gyro-S --context 32768 --vision no --yes --no-start | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "XeStrata preparation failed (exit $LASTEXITCODE). Rerun after correcting the reported error." }
+    if (Test-XeStrataNeedsPreparation -Executable $Executable) {
+        Write-Host 'Preparing XeStrata Gyro-S. The large download may take hours; progress appears below.'
+        & $Executable --setup --family gyro --model Gyro-S --context 32768 --vision no --yes --no-start | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "XeStrata preparation failed (exit $LASTEXITCODE). Rerun after correcting the reported error." }
+        # Verify what was actually prepared before relying on newest-config startup.
+        if (Test-XeStrataNeedsPreparation -Executable $Executable) { throw 'XeStrata preparation returned without a saved model configuration.' }
+    }
     Assert-XeStrataIdle
     # --model would enter setup again. Upstream --yes starts the newest saved config,
-    # which the synchronous Gyro-S preparation above just wrote.
+    # which the inventory check above verified as the only matching configuration.
     return Start-Process -FilePath $Executable -ArgumentList @('--yes','--port','8095') -PassThru
 }
 $xe = $null
@@ -108,3 +143,4 @@ while ([DateTime]::UtcNow -lt $deadline) {
 }
 if (-not $ready) { throw "Model endpoint on $port did not become ready within $ModelReadyTimeoutMinutes minutes. The process was left running; do not launch another copy. Inspect the model window, then rerun this stage or Connect-LocalModel.ps1 -Port $port when ready." }
 & (Join-Path $PSScriptRoot 'Connect-LocalModel.ps1') -Port $port
+
