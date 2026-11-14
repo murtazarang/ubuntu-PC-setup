@@ -20,4 +20,26 @@ $roles.default = $selector
 $encoded = ConvertTo-Json -InputObject $roles -Compress -Depth 20
 & $omp config set modelRoles $encoded
 if ($LASTEXITCODE -ne 0) { throw 'Could not set the default OMP model.' }
-Write-Host "OMP default model: $selector (127.0.0.1:$Port)"
+# BEGIN effective-model verification (safe mock tests execute this block)
+# config set writes globally; config get returns the effective layered value.
+# Never clear project, environment or runtime overrides to force our default.
+try {
+    $effectiveRaw = (& $omp config get modelRoles --json | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw 'OMP effective-role readback failed.' }
+    $effective = $effectiveRaw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+    if ($effective -isnot [System.Collections.IDictionary] -or
+        $effective.value -isnot [System.Collections.IDictionary] -or
+        -not $effective.value.Contains('default') -or
+        $effective.value.default -isnot [string]) {
+        throw 'OMP effective-role readback has an unexpected format.'
+    }
+    if ($effective.value.default -eq $selector) {
+        Write-Host "OMP effective default model here: $selector (127.0.0.1:$Port). Other projects may override it."
+    } else {
+        Write-Warning "Saved global OMP model $selector, but the effective default here is '$($effective.value.default)'. Existing overrides were preserved; inspect OMP project/environment settings if you want this local model here."
+    }
+} catch {
+    Write-Warning "Saved global OMP model $selector, but could not verify the effective default: $($_.Exception.Message) Existing overrides were preserved."
+}
+# END effective-model verification
+
