@@ -14,7 +14,7 @@ class InstallerPolicyTests(unittest.TestCase):
     def test_requested_installers_and_no_pinned_driver(self):
         apps = (ROOT / 'Install-Apps.ps1').read_text(encoding='utf-8')
         drivers = (ROOT / 'Install-Drivers.ps1').read_text(encoding='utf-8')
-        self.assertIn('FanControl_285_net_4_8_Installer.exe', apps)
+        self.assertNotIn('FanControl_285_net_4_8_Installer.exe', apps)
         self.assertIn('https://release.signalrgb.com/Install_SignalRgb.exe', apps)
         self.assertIn('NVIDIA App', drivers)
         self.assertIn('Intel Driver & Support Assistant', drivers)
