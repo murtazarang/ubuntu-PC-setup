@@ -38,7 +38,7 @@ and Wikipedia. NVIDIA uses IQ2_XS for one GPU or IQ3_XXS with both GPUs; Intel
 uses XeStrata Gyro-S. Model use remains local by default; hosted providers are
 not disabled.
 
-The installed applications include Steam, Firefox, Stremio, Mailspring,
+The installed applications include Steam, Firefox, Stremio,
 Spotify, VS Code, PowerToys, ArtCraft Studio, the selected Paseo beta, the
 exact FanControl V285 installer and the supplied SignalRGB installer. These
 installers may display their own prompts. Steam games use native Windows
