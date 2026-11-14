@@ -17,7 +17,7 @@ if ($LASTEXITCODE -ne 0 -or -not $selector.StartsWith('local-inference/')) {
 # OMP commands/config.ts parses --scope; config-cli.ts handleListLayer omits unset keys.
 $globalRaw = (& $omp config list --scope global --json | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'Could not read global OMP roles.' }
-$globalSettings = $globalRaw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+$globalSettings = $globalRaw | ConvertFrom-Json -AsHashtable -NoEnumerate -ErrorAction Stop
 if ($globalSettings -isnot [System.Collections.IDictionary]) { throw 'OMP global settings are not a mapping.' }
 $roles = @{}
 if ($globalSettings.Contains('modelRoles')) {
@@ -39,7 +39,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not set the default OMP model.' }
 try {
     $effectiveRaw = (& $omp config get modelRoles --json | Out-String)
     if ($LASTEXITCODE -ne 0) { throw 'OMP effective-role readback failed.' }
-    $effective = $effectiveRaw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+    $effective = $effectiveRaw | ConvertFrom-Json -AsHashtable -NoEnumerate -ErrorAction Stop
     if ($effective -isnot [System.Collections.IDictionary] -or
         $effective.value -isnot [System.Collections.IDictionary] -or
         -not $effective.value.Contains('default') -or
