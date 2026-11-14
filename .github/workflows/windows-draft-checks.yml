@@ -25,6 +25,9 @@ jobs:
       - name: Execute mocked update tests
         shell: pwsh
         run: ./windows/tests/test-updates.ps1
+      - name: Execute mocked model lifecycle tests
+        shell: pwsh
+        run: ./windows/test-model-lifecycle.ps1
       - name: Run isolated Python tests
         shell: pwsh
         run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
