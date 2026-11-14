@@ -21,7 +21,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP installation failed.' }
     $bridge = Join-Path $env:UV_TOOL_BIN_DIR 'openzim-mcp.exe'
     if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) { throw 'OpenZIM executable was not installed.' }
-    Write-Host 'Checking OpenZIM MCP startup (--help); this does not download Wikipedia.'
+    Write-Host 'Checking OpenZIM MCP startup (--help); please wait. Wikipedia has not started downloading yet.'
     & $bridge --help | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP startup check failed.' }
 } finally {
@@ -38,7 +38,7 @@ $final = Join-Path $ArchiveDirectory $name
 $part = "$final.part"
 # Kiwix publishes SHA-256 sidecars. Fetch afresh, never trust a stale checksum.
 $checksum = "$final.sha256.download"
-Write-Host 'Fetching the official Wikipedia SHA-256 checksum from Kiwix.'
+Write-Host 'Fetching the official Wikipedia SHA-256 checksum from Kiwix; please wait, network requests can take time.'
 & curl.exe --fail --location --retry 3 --output $checksum "https://download.kiwix.org/zim/wikipedia/$name.sha256"
 if ($LASTEXITCODE -ne 0) { throw 'Could not obtain official Wikipedia checksum; archive not registered.' }
 $checksumText = (Get-Content -LiteralPath $checksum -Raw).Trim()
