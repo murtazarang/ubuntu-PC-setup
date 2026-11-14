@@ -16,12 +16,22 @@ class ConfigTests(unittest.TestCase):
         m.merge_mcp(data, 'C:/uvx.exe', 'D:/wiki')
         m.merge_mcp(data, 'C:/uvx.exe', 'D:/wiki')
         self.assertEqual(data['mcpServers']['existing']['command'], 'other')
-        self.assertEqual(data['mcpServers']['openzim']['args'], ['--offline', 'openzim-mcp==3.4.0', 'D:/wiki'])
+        self.assertEqual(data['mcpServers']['openzim']['args'], ['D:/wiki'])
         self.assertEqual(data['other'], 42)
 
     def test_conflicting_entry_rejected(self):
         with self.assertRaises(ValueError):
             m.merge_mcp({'mcpServers': {'openzim': {'command': 'custom'}}}, 'uvx', 'wiki')
+
+    def test_exact_legacy_migration_only(self):
+        legacy = {'type': 'stdio', 'command': 'uvx.exe',
+                  'args': ['--offline', 'openzim-mcp==3.4.0', 'wiki']}
+        data = {'mcpServers': {'openzim': legacy.copy()}}
+        m.merge_mcp(data, 'bridge.exe', 'wiki', 'uvx.exe')
+        self.assertEqual(data['mcpServers']['openzim']['command'], 'bridge.exe')
+        legacy['custom'] = True
+        with self.assertRaises(ValueError):
+            m.merge_mcp({'mcpServers': {'openzim': legacy}}, 'bridge.exe', 'wiki', 'uvx.exe')
 
     def test_provider_preserves_other_settings(self):
         data = {'agents': {'providers': {'omp': {'custom': True},
