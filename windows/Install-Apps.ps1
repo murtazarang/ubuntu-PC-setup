@@ -42,7 +42,7 @@ function Test-SignalRgbInstalled {
 function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '', [string]$DisplayNamePattern, [switch]$SignalRgb) {
     if (-not $DisplayNamePattern) { throw 'An application detection pattern is required.' }
     if ((Test-DirectAppInstalled $DisplayNamePattern) -or ($SignalRgb -and (Test-SignalRgbInstalled))) {
-        Write-Host "$Name application already registered; preserving the installed version."
+        Write-Host "$Name installation detected; preserving the installed version."
         return
     }
     $folder = Join-Path $env:TEMP 'UbuntuPCSetup-Windows'
