@@ -42,8 +42,9 @@ if ($Hardware -like 'Nvidia*') {
         $installer = Join-Path $env:TEMP 'strata-install.ps1'
         Invoke-WebRequest -Uri 'https://github.com/Niko1221/Strata/releases/latest/download/install.ps1' -OutFile $installer
         & $installer
-        if ($LASTEXITCODE -ne 0) { throw 'Strata installer failed.' }
-        $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+        # A successful script may leave a nonzero native exit from an upstream fallback.
+        if (-not $?) { throw 'Strata installer failed.' }
+        $env:Path = (@($env:Path, [Environment]::GetEnvironmentVariable('Path','User'), [Environment]::GetEnvironmentVariable('Path','Machine')) | Where-Object { $_ }) -join ';'
         $strata = Get-Command strata.cmd -CommandType Application -ErrorAction Stop
     }
     $argsList = @('launch','--family','qwen','--context','32k','--access','local','--vision','off','--yes','--no-tui')
