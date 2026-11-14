@@ -40,6 +40,12 @@ function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { thr
 try {
     $install = Join-Path $root "path with spaces and apostrophe's"
     New-Item -ItemType Directory -Path $install -Force | Out-Null
+    Assert ((Get-ExecutionPolicy) -eq 'Restricted') 'Restricted policy is not effective; test invalid.'
+    $probe = Join-Path $root 'restricted-probe.ps1'
+    Set-Content -LiteralPath $probe -Value "throw 'Restricted policy failed to block this file'"
+    $blocked = $false
+    try { & $probe } catch [System.Management.Automation.PSSecurityException] { $blocked = $true }
+    Assert $blocked 'Restricted policy did not block direct script execution; test invalid.'
     Set-Content -LiteralPath (Join-Path $install 'portrait.yaml') -Value 'MY CUSTOM THEME'
     $Rotation = 'invalid caller value'
     $InstallDir = 'do not modify caller'
