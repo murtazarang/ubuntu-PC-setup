@@ -1,6 +1,9 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param([string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'AX206Panel'))
+param(
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'AX206Panel'),
+    [ValidateSet(0,90,180,270)][int]$Rotation = 270
+)
 $ErrorActionPreference = 'Stop'
 $commit = '11280756789f1d61b80b49383b255acde62a9c60'
 $uv = Get-Command uv.exe -ErrorAction SilentlyContinue
@@ -37,5 +40,8 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'panel.py') -Destination $Instal
 if (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'portrait.yaml'))) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'portrait.yaml') -Destination $InstallDir
 }
-Write-Host "Installed at $InstallDir. No USB driver, PawnIO, startup task or other application was changed."
-Write-Host 'Next: run .\Run.ps1 -Action Info, then .\Run.ps1 -Rotation 270 (or 90 if upside down).'
+# Register for next sign-in only; never start or stop a running display here.
+& (Join-Path $PSScriptRoot 'autostart.ps1') -InstallDir $InstallDir -Rotation $Rotation
+Write-Host "Installed at $InstallDir with sign-in startup. No USB driver, PawnIO or other application was changed."
+Write-Host 'The display will start without a terminal at your next Windows sign-in. Do not start a second copy if it is already running.'
+
