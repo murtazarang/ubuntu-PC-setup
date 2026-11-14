@@ -15,7 +15,7 @@ irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/r
 
 The launcher asks which PC and stage, gets the required files automatically,
 and runs that stage. Run it again after the driver step and reboot, choosing
-Desktop. It needs internet and WinGet. This is still an unverified draft.
+Desktop. It needs internet and WinGet. This is still an unverified draft. The launcher prints the retained setup folder so its recovery helpers remain accessible after execution.
 
 ## Intended workflow
 
@@ -44,7 +44,7 @@ exact FanControl V285 installer and the supplied SignalRGB installer. These
 installers may display their own prompts. Steam games use native Windows
 graphics APIs; no Proton is needed. PowerToys Run targets Win+F2, PowerToys
 Awake provides an on-demand keep-awake switch, and Windows clipboard history
-uses Win+V. User-level data and the separate HDD are not modified by design.
+uses Win+V. Everything and the EverythingPowerToys plugin provide indexed search in PowerToys Run; actual integration still needs a Windows smoke test. User-level data and the separate HDD are not modified by design.
 
 Oh My Pi is configured to use the complete scientific, scientific-writer and
 Education Agent Skills libraries and the locally cached OpenZIM MCP bridge.
@@ -54,7 +54,7 @@ space. To place the archive elsewhere pass `-ArchiveDirectory D:\YourFolder`
 to the Desktop stage. An interrupted archive download can be resumed by
 rerunning `Install-Reference.ps1` with the same directory.
 
-Firefox uses managed add-on policies. After first launch, let the three extensions
+Firefox uses managed add-on policies. Existing uBlock profiles are protected from automatic filter replacement; review the script output if an existing profile is detected. After first launch, let the three extensions
 load, close Firefox and run `./Configure-Firefox.ps1 -Release` from an elevated
 terminal. This removes the one-time enforced filter-list values so later user
 edits persist; the advanced Twitch resource URL remains managed.
