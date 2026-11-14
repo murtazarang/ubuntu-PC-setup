@@ -10,20 +10,41 @@ $uvx = (Get-Command uvx.exe -CommandType Application -ErrorAction Stop).Source
 $omp = (Get-Command omp.exe -CommandType Application -ErrorAction Stop).Source
 New-Item -ItemType Directory -Force -Path $ArchiveDirectory | Out-Null
 
-# Prime uv's cache now. The MCP entry uses --offline to avoid contacting a
-# registry during a later offline study session.
-& $uvx 'openzim-mcp==3.4.0' --help | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP installation failed.' }
+# A dedicated durable tool environment avoids evictable uvx cache and does not
+# replace a user's independently installed OpenZIM tool. Restore process settings.
+$oldToolDir = $env:UV_TOOL_DIR
+$oldToolBinDir = $env:UV_TOOL_BIN_DIR
+try {
+    $env:UV_TOOL_DIR = Join-Path $env:LOCALAPPDATA 'OpenZIM\tools'
+    $env:UV_TOOL_BIN_DIR = Join-Path $env:LOCALAPPDATA 'OpenZIM\bin'
+    & $uv tool install --python 3.12 'openzim-mcp==3.4.0'
+    if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP installation failed.' }
+    $bridge = Join-Path $env:UV_TOOL_BIN_DIR 'openzim-mcp.exe'
+    if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) { throw 'OpenZIM executable was not installed.' }
+    & $bridge --help | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP startup check failed.' }
+} finally {
+    $env:UV_TOOL_DIR = $oldToolDir
+    $env:UV_TOOL_BIN_DIR = $oldToolBinDir
+}
 $agentDir = (& $omp config path | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to find OMP configuration directory.' }
 $paseoHome = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE '.paseo' }
 $paseoConfig = Join-Path $paseoHome 'config.json'
-& $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --paseo-config $paseoConfig --uvx $uvx --omp $omp --zim-dir $ArchiveDirectory
-if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP and Paseo.' }
-
 $name = 'wikipedia_en_all_nopic_2026-06.zim'
 $final = Join-Path $ArchiveDirectory $name
 $part = "$final.part"
+# Kiwix publishes SHA-256 sidecars. Fetch afresh, never trust a stale checksum.
+$checksum = "$final.sha256.download"
+& curl.exe --fail --location --retry 3 --output $checksum "https://download.kiwix.org/zim/wikipedia/$name.sha256"
+if ($LASTEXITCODE -ne 0) { throw 'Could not obtain official Wikipedia checksum; archive not registered.' }
+$checksumText = (Get-Content -LiteralPath $checksum -Raw).Trim()
+if ($checksumText -notmatch '^([0-9a-fA-F]{64})(?:\s+\*?([^\r\n]+))?$') {
+    throw 'Unexpected official SHA-256 file format; archive not registered.'
+}
+$expectedHash = $Matches[1]
+if ($Matches.ContainsKey(2) -and $Matches[2] -ne $name) { throw 'Checksum filename does not match requested archive.' }
+
 if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     $free = (Get-Item -LiteralPath $ArchiveDirectory).PSDrive.Free
     # Allow a resumed download to count bytes already present.
@@ -35,8 +56,17 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     & curl.exe --fail --location --retry 3 --continue-at - --output $part "https://download.kiwix.org/zim/wikipedia/$name"
     if ($LASTEXITCODE -ne 0) { throw 'Wikipedia download failed; rerun this script to resume.' }
     if ((Get-Item -LiteralPath $part).Length -lt 40GB) { throw 'Wikipedia archive is unexpectedly small; refusing to mark complete.' }
+    if ((Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash -ne $expectedHash) {
+        throw "Wikipedia checksum mismatch. Partial file retained at $part; remove it before retrying a fresh download."
+    }
     Move-Item -LiteralPath $part -Destination $final
 } else {
-    Write-Host "Keeping existing archive $final"
+    if ((Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash -ne $expectedHash) {
+        throw "Existing archive checksum mismatch: $final. File preserved; repair or move it before rerunning."
+    }
+    Write-Host "Verified existing archive $final"
 }
+& $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --paseo-config $paseoConfig --bridge $bridge --legacy-uvx $uvx --omp $omp --zim-dir $ArchiveDirectory
+if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP and Paseo.' }
+
 Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP and Paseo."
