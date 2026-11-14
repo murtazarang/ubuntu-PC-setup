@@ -12,14 +12,27 @@ $selector = (& $uv run --no-project --with PyYAML python (Join-Path $PSScriptRoo
 if ($LASTEXITCODE -ne 0 -or -not $selector.StartsWith('local-inference/')) {
     throw 'Could not read the local model endpoint or update OMP models.'
 }
-$current = (& $omp config get modelRoles --json | Out-String | ConvertFrom-Json -AsHashtable)
-if ($LASTEXITCODE -ne 0) { throw 'Could not read OMP roles.' }
-$roles = $current.value
-if ($roles -isnot [System.Collections.IDictionary]) { throw 'OMP model roles are not a mapping.' }
+# BEGIN global-model update (safe mock tests execute this block)
+# Read only the saved global layer; never copy effective project roles globally.
+# OMP commands/config.ts parses --scope; config-cli.ts handleListLayer omits unset keys.
+$globalRaw = (& $omp config list --scope global --json | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'Could not read global OMP roles.' }
+$globalSettings = $globalRaw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+if ($globalSettings -isnot [System.Collections.IDictionary]) { throw 'OMP global settings are not a mapping.' }
+$roles = @{}
+if ($globalSettings.Contains('modelRoles')) {
+    $entry = $globalSettings['modelRoles']
+    if ($entry -isnot [System.Collections.IDictionary] -or -not $entry.Contains('value') -or
+        $entry['value'] -isnot [System.Collections.IDictionary]) {
+        throw 'OMP global model roles are not a mapping; existing settings preserved.'
+    }
+    $roles = $entry['value']
+}
 $roles.default = $selector
 $encoded = ConvertTo-Json -InputObject $roles -Compress -Depth 20
 & $omp config set modelRoles $encoded
 if ($LASTEXITCODE -ne 0) { throw 'Could not set the default OMP model.' }
+# END global-model update
 # BEGIN effective-model verification (safe mock tests execute this block)
 # config set writes globally; config get returns the effective layered value.
 # Never clear project, environment or runtime overrides to force our default.
