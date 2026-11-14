@@ -76,7 +76,7 @@ function Install-Spotify {
 }
 $packages = @(
     'Git.Git', 'astral-sh.uv', 'Mozilla.Firefox', 'Valve.Steam',
-    'Stremio.Stremio', 'Foundry376.Mailspring', 'Microsoft.VisualStudioCode',
+    'Stremio.Stremio', 'Microsoft.VisualStudioCode',
     'Microsoft.PowerToys', '7zip.7zip',
     'Microsoft.DotNet.DesktopRuntime.10', 'Microsoft.VCRedist.2015+.x64'
 )
