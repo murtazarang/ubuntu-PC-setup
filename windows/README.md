@@ -39,7 +39,7 @@ uses XeStrata Gyro-S. Model use remains local by default; hosted providers are
 not disabled.
 
 The installed applications include Steam, Firefox, Stremio,
-Spotify, VS Code, PowerToys, ArtCraft Studio, the selected Paseo beta, the
+Spotify, VS Code, PowerToys, the selected Paseo beta and the
 supplied SignalRGB installer. These
 installers may display their own prompts. Steam games use native Windows
 graphics APIs; no Proton is needed. PowerToys Run targets Win+F2, PowerToys
