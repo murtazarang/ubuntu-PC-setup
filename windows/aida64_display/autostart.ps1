@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# Opt-in sign-in task for an already installed AX206Panel. Safe to download with irm | iex.
+# Sign-in task for an already installed AX206Panel. Safe to download with irm | iex.
 & {
 [CmdletBinding()]
 param(
@@ -19,8 +19,13 @@ $arguments = '"' + $runner + '" --rotation ' + $Rotation
 $existing = @(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -eq $taskName })
 if ($existing.Count -gt 0) {
     $task = $existing[0]
+    $existingSid = $task.Principal.UserId
+    if ($existingSid -notmatch '^S-1-') {
+        try { $existingSid = (New-Object Security.Principal.NTAccount($existingSid)).Translate([Security.Principal.SecurityIdentifier]).Value }
+        catch { throw "Cannot identify the owner of existing task $taskName. It has not been changed." }
+    }
     if ($task.Description -ne $marker -or @($task.Actions).Count -ne 1 -or
-        $task.Actions[0].Execute -ne $python -or $task.Principal.UserId -ne $sid -or
+        $task.Actions[0].Execute -ne $python -or $existingSid -ne $sid -or
         $task.Actions[0].Arguments -notmatch ('^' + [regex]::Escape('"' + $runner + '" --rotation ') + '(0|90|180|270)$')) {
         throw "A different task named $taskName already exists. It has not been changed. Inspect it in Task Scheduler."
     }
