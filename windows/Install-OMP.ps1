@@ -11,7 +11,7 @@ if (-not $omp) {
         & $tempFile -Binary
         if (-not $?) { throw 'Oh My Pi installer failed.' }
     } finally { Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue }
-    $env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+    $env:Path = (@($env:Path, [Environment]::GetEnvironmentVariable('Path','User'), [Environment]::GetEnvironmentVariable('Path','Machine')) | Where-Object { $_ }) -join ';'
     $omp = Get-Command omp.exe -CommandType Application -ErrorAction SilentlyContinue
 }
 if (-not $omp) { throw 'Oh My Pi is not on PATH after installation. Open a new terminal and retry.' }
