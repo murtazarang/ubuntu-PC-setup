@@ -4,6 +4,10 @@ $code = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\install.ps1') -Raw
 $root = Join-Path ([IO.Path]::GetTempPath()) ('ax-launcher-test-' + [guid]::NewGuid())
 $script:Missing = $false
 $script:FailSetup = $false
+$script:FailRun = $false
+$oldPolicy = $env:PSExecutionPolicyPreference
+# Restrict only this test process. Launcher must use child-process Bypass.
+$env:PSExecutionPolicyPreference = 'Restricted'
 function Get-Command {
     param($Name, $ErrorAction)
     if ($Name -ne 'uv.exe') { throw "Unexpected lookup: $Name" }
@@ -23,13 +27,14 @@ function Expand-Archive {
     $setup = @'
 param($InstallDir)
 if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'panel.py'))) { throw 'PSScriptRoot was lost' }
-if ($script:FailSetup) { throw 'Mock setup failure' }
 Set-Content -LiteralPath (Join-Path $InstallDir 'setup-called') -Value $PSScriptRoot
 '@
     # Put the failure directly into the generated script, independent of scope.
     if ($script:FailSetup) { $setup = "param(`$InstallDir)`nthrow 'Mock setup failure'" }
     Set-Content -LiteralPath (Join-Path $files 'Setup.ps1') -Value $setup
-    Set-Content -LiteralPath (Join-Path $files 'Run.ps1') -Value 'param($InstallDir,$Rotation) Set-Content -LiteralPath (Join-Path $InstallDir "run-called") -Value $Rotation'
+    $runner = 'param($InstallDir,$Rotation) Set-Content -LiteralPath (Join-Path $InstallDir "run-called") -Value $Rotation'
+    if ($script:FailRun) { $runner = 'param($InstallDir,$Rotation) exit 17' }
+    Set-Content -LiteralPath (Join-Path $files 'Run.ps1') -Value $runner
 }
 function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { throw $Message } }
 try {
@@ -51,19 +56,21 @@ try {
     $env:LOCALAPPDATA = Join-Path $root 'iex profile'
     try { Invoke-Expression $code } finally { $env:LOCALAPPDATA = $oldLocal }
     Assert ($Rotation -eq 'invalid caller value') 'iex leaked parameter attributes or values'
-    foreach ($kind in @('Missing','FailSetup')) {
-        $script:Missing = $kind -eq 'Missing'; $script:FailSetup = $kind -eq 'FailSetup'
+    foreach ($kind in @('Missing','FailSetup','FailRun')) {
+        $script:Missing = $kind -eq 'Missing'; $script:FailSetup = $kind -eq 'FailSetup'; $script:FailRun = $kind -eq 'FailRun'
         $target = Join-Path $root $kind
         $failed = $false
         try { & ([scriptblock]::Create($code)) -InstallDir $target } catch {
-            $failed = $_.Exception.Message -like '*missing AX206 file*' -or $_.Exception.Message -like '*Mock setup failure*'
+            $failed = $_.Exception.Message -like '*missing AX206 file*' -or $_.Exception.Message -like '*Setup.ps1 failed with exit code*' -or $_.Exception.Message -like '*Run.ps1 failed with exit code 17*'
         }
         Assert $failed "Failure was not propagated: $kind"
         Assert (-not (Test-Path -LiteralPath (Join-Path $target 'run-called'))) 'Runner launched after failure'
         Assert (Test-Path -LiteralPath (Join-Path $target 'setup-runs')) 'Failure recovery files missing'
     }
-    Write-Host 'PASS: launcher scope, real iex, path quoting, setup-only, start/rotation, rerun preservation and failure propagation.'
+    Assert ($env:PSExecutionPolicyPreference -eq 'Restricted') 'Launcher changed caller execution policy'
+    Write-Host 'PASS: Restricted parent policy, real child host and exit propagation, launcher scope, real iex, path quoting, setup-only, start/rotation, rerun preservation and failure propagation.'
 } finally {
+    $env:PSExecutionPolicyPreference = $oldPolicy
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
     $global:LASTEXITCODE = 0
 }
