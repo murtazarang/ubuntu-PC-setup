@@ -64,6 +64,12 @@ jobs:
       - name: Test XeStrata model inventory
         shell: pwsh
         run: ./windows/test-xestrata-inventory.ps1
+      - name: Test offline reference and desktop safety
+        shell: pwsh
+        run: |
+          ./windows/tests/test-reference.ps1
+          ./windows/tests/test-desktop-discovery.ps1
+          ./windows/tests/test-firefox-scope.ps1
       - name: Run isolated Python tests
         shell: pwsh
         run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
