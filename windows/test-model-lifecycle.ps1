@@ -17,6 +17,7 @@ $script:listeners = @()
 $script:prepared = 0
 $script:started = 0
 $script:prepareExit = 0
+function Test-XeStrataNeedsPreparation { param($Executable) return ($script:prepared -eq 0 -or $script:prepareExit -ne 0) }
 function Get-Process { param($Name, $ErrorAction) $script:running }
 function Get-NetTCPConnection { param($State, $ErrorAction) $script:listeners }
 function fake-xestrata {
