@@ -27,13 +27,41 @@ function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = ''
     $p = Start-Process -FilePath $file -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw "$Name exited with code $($p.ExitCode)" }
 }
+function Test-SpotifyInstalled {
+    # Preserve either an existing Win32 installation or the user's Store package.
+    foreach ($key in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                       'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                       'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')) {
+        foreach ($entry in @(Get-ItemProperty -Path $key -ErrorAction SilentlyContinue)) {
+            if ($entry.PSObject.Properties['DisplayName'] -and $entry.DisplayName -match '^Spotify(?:$|\s)') { return $true }
+        }
+    }
+    if (Test-Path -LiteralPath (Join-Path $env:APPDATA 'Spotify\Spotify.exe')) { return $true }
+    # Appx is a Windows PowerShell module. Query it in the built-in host rather
+    # than depending on its compatibility with the current PowerShell 7 build.
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    & $windowsPowerShell -NoProfile -NonInteractive -Command '$ErrorActionPreference = "Stop"; try { if (Get-AppxPackage -Name SpotifyAB.SpotifyMusic) { exit 0 }; exit 1 } catch { Write-Error $_; exit 2 }'
+    if ($LASTEXITCODE -eq 0) { return $true }
+    if ($LASTEXITCODE -eq 1) { return $false }
+    throw 'Could not determine whether Spotify is installed; refusing to install a duplicate.'
+}
+function Install-Spotify {
+    if (Test-SpotifyInstalled) { Write-Host 'Spotify is already installed; preserving it.'; return }
+    # Spotify's Win32 installer prohibits elevation. Use its official Store
+    # distribution instead; this installation has NOT been hardware-tested.
+    & winget.exe install --id 9NCBCSZSJRSB --exact --source msstore --accept-source-agreements --accept-package-agreements --disable-interactivity --no-upgrade
+    $code = '0x{0:X8}' -f ([long]$LASTEXITCODE -band 0xFFFFFFFFL)
+    if ($code -notin @('0x00000000', '0x8A150061', '0x8A15010D')) { throw "Spotify Store installation failed ($code)." }
+    if (-not (Test-SpotifyInstalled)) { throw 'Spotify installation returned without a detectable installation.' }
+}
 $packages = @(
     'Git.Git', 'astral-sh.uv', 'Mozilla.Firefox', 'Valve.Steam',
     'Stremio.Stremio', 'Foundry376.Mailspring', 'Microsoft.VisualStudioCode',
-    'Spotify.Spotify', 'Microsoft.PowerToys', '7zip.7zip',
+    'Microsoft.PowerToys', '7zip.7zip',
     'Microsoft.DotNet.DesktopRuntime.10', 'Microsoft.VCRedist.2015+.x64'
 )
 foreach ($app in $packages) { Install-WingetApp $app }
+Install-Spotify
 # Pin the user's selected Paseo beta and the official Windows asset.
 Run-Installer 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-Setup-0.16.0-beta.2-x64.exe' 'Paseo-Setup-0.16.0-beta.2-x64.exe' 'd957b0b9978ef9283f6b794f0cd950563fc849b6f00266bea709fba903ed442f'
 # These are the exact installers supplied by the user, not substituted versions.
