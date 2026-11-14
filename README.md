@@ -37,6 +37,17 @@ Run in a **logged-in GNOME desktop session**:
 
 This tries the linked Stremio deb and uses the approved, officially listed Stremio Flatpak if its dependencies cannot resolve; it installs the linked Paseo package, ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; removes Thunderbird after Mailspring installation; installs local writing/science tools using `uv`; installs the three GNOME extensions and Super+F2 launcher shortcut; configures Firefox extensions and uBlock; clones both complete skills packages; enables Paseo's built-in OMP provider; and configures the appropriate local model. First model download can be 58–76 GB or more and will take time. OMP defaults to the local model without requiring a K-Dense or Anthropic account; its other providers remain available if you choose to configure them later. Some bundled skills describe services that are unavailable offline; the full skills remain present and the global OMP rule directs it to local methods.
 
+### Offline educational reference
+
+The desktop stage registers the complete Education Agent Skills portable release alongside the two existing skill collections, and installs a local Kiwix MCP bridge for Oh My Pi. The desktop stage also downloads the Wikipedia archive (about 49 GiB). To retry or resume that download separately, run:
+
+```bash
+./download-wikipedia.sh
+```
+
+This downloads the English full-text June 2026 Wikipedia snapshot without pictures to `~/.local/share/kiwix-mcp/archives`. An interrupted download can be resumed. To use a different location, set `KIWIX_ARCHIVE_DIR` to the same directory when running both `./configure-kiwix.sh` and `./download-wikipedia.sh`. Restart Oh My Pi after configuration. Ask it to search the Kiwix archive and cite the article. The archive is a dated snapshot and source lookup does not guarantee that a model's answer is correct. Textbook PDF search is not included. No cloud account is needed for the bridge.
+
+
 Models: one NVIDIA GPU → Qwen3.8-Flash-Next IQ2_XS; two NVIDIA GPUs → IQ3_XXS with one main and one helper; Intel GPU → XeStrata Gyro-S. The Intel render group change requires logging out and in, then rerunning the desktop stage. For XeStrata, a user service starts the model for setup but is not enabled at login. Stop it when gaming with `systemctl --user stop xestrata`; start with `systemctl --user start xestrata`. NVIDIA Strata provides `strata launch --status` and `strata launch --stop`. If the model is still loading when the setup times out, run `./connect-xestrata.sh 8095` once it is ready.
 
 Paseo uses the requested `0.16.0-beta.2`, not an automatically selected stable substitute. Restart it after setup. Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.

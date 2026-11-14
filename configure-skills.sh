@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install both complete skill repositories for Oh My Pi; run as the desktop user.
+# Install complete scientific, writing, and education skills for Oh My Pi; run as the desktop user.
 set -Eeuo pipefail
 if (( EUID == 0 )); then echo 'Run without sudo as the desktop user.' >&2; exit 1; fi
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
@@ -18,11 +18,23 @@ clone_or_keep() {
 }
 clone_or_keep https://github.com/K-Dense-AI/scientific-agent-skills.git "$root/scientific-agent-skills"
 clone_or_keep https://github.com/K-Dense-AI/claude-scientific-writer.git "$root/claude-scientific-writer"
+education="$root/education-agent-skills"
+if [[ ! -d "$education/agent-skills" ]]; then
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  curl -fL --retry 3 -o "$tmp/education.zip" https://github.com/GarethManning/education-agent-skills/releases/download/v3.1.0/education-agent-skills-portable-v3.1.0.zip
+  python3 -m zipfile -e "$tmp/education.zip" "$tmp/extracted"
+  [[ -d "$tmp/extracted/agent-skills" ]] || { echo "Unexpected education archive layout" >&2; exit 1; }
+  [[ ! -e "$education" ]] || { echo "Refusing to overwrite $education" >&2; exit 1; }
+  mkdir -p "$education"
+  cp -a "$tmp/extracted/." "$education/"
+  rm -rf "$tmp"; trap - EXIT
+fi
+education="$education/agent-skills"
 writer="$root/claude-scientific-writer/skills"
 science="$root/scientific-agent-skills/skills"
 [[ -d $writer && -d $science ]] || { echo 'Expected skills directories missing.' >&2; exit 1; }
 existing=$(omp config get skills.customDirectories --json | jq -ec '.value | if type == "array" then . else error("not an array") end')
-merged=$(jq -cn --argjson old "$existing" --arg w "$writer" --arg s "$science" 'reduce ($old + [$w,$s])[] as $item ([]; if index($item) then . else . + [$item] end)')
+merged=$(jq -cn --argjson old "$existing" --arg w "$writer" --arg s "$science" --arg e "$education" 'reduce ($old + [$w,$s,$e])[] as $item ([]; if index($item) then . else . + [$item] end)')
 omp config set skills.customDirectories "$merged"
 omp config set skills.enabled true
 omp config set skills.enableSkillCommands true
@@ -38,9 +50,10 @@ Use the configured local language model by default. Imported scientific skills m
 RULE
 fi
 printf 'Scientific skills: '; find "$science" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l
+printf 'Education skills: '; find "$education" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l
 printf 'Writer skills: '; find "$writer" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l
 omp skill list --json > "$root/installed-skills.json"
-/usr/bin/python3 - "$root/installed-skills.json" "$writer" "$science" <<'PYCODE'
+/usr/bin/python3 - "$root/installed-skills.json" "$writer" "$science" "$education" <<'PYCODE'
 import json,os,pathlib,sys
 inventory, *roots=sys.argv[1:]
 with open(inventory) as f: listed=json.load(f)
@@ -52,4 +65,12 @@ if missing:
  raise SystemExit(1)
 print(f'OMP discovered all {len(expected)} skill definitions.')
 PYCODE
-echo "Registered both full skill trees. Inventory: $root/installed-skills.json"
+if ! grep -Fq '<!-- ubuntu-pc-setup-education-sources -->' "$rules" 2>/dev/null; then
+  cat >> "$rules" <<'RULE'
+
+<!-- ubuntu-pc-setup-education-sources -->
+For coursework and factual educational questions, consult relevant user-provided course material first when available. Use the local Kiwix reference archive when useful; search and read relevant entries before citing them, give the article title and source URI, and distinguish dated reference material from current information. State when sources do not support an answer. Do not invent page numbers or citations.
+<!-- /ubuntu-pc-setup-education-sources -->
+RULE
+fi
+echo "Registered all three full skill trees. Inventory: $root/installed-skills.json"
