@@ -28,6 +28,11 @@ foreach ($update in $result.Updates) {
     }
     [void]$updates.Add($update)
 }
+# Report deferred items before a later operation can stop this stage.
+if ($manual.Count -gt 0) {
+    Write-Warning 'Some updates require separate installation, user interaction or a license response; finish them in Windows Update:'
+    $manual | ForEach-Object { Write-Warning $_ }
+}
 if ($updates.Count -gt 0) {
     Write-Host "Downloading $($updates.Count) Windows updates."
     $downloader = $session.CreateUpdateDownloader()
@@ -43,10 +48,10 @@ if ($updates.Count -gt 0) {
         throw 'Windows Update now requires a restart before installation. Restart and rerun the Drivers stage.'
     }
     $result = $installer.Install()
-    if ($result.ResultCode -ne 2) { throw "Windows Update installation did not fully succeed (code $($result.ResultCode)). Open Windows Update for details." }
+    if ($result.ResultCode -ne 2) {
+        $restartGuidance = if ($result.RebootRequired) { ' Restart Windows before retrying the Drivers stage.' } else { '' }
+        throw "Windows Update installation did not fully succeed (code $($result.ResultCode)). Open Windows Update for details.$restartGuidance"
+    }
     if ($result.RebootRequired) { throw 'Windows updates require a reboot. Restart and rerun the Drivers stage.' }
 } else { Write-Host 'No automatically installable Windows software updates found.' }
-if ($manual.Count -gt 0) {
-    Write-Warning 'Some updates require separate installation, user interaction or a license response; finish them in Windows Update:'
-    $manual | ForEach-Object { Write-Warning $_ }
-}
+
