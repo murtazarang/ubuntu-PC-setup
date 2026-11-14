@@ -22,11 +22,20 @@ if ($Stage -eq 'Drivers') {
 }
 
 & (Join-Path $PSScriptRoot 'Install-Apps.ps1')
-# Refresh paths for programs installed by WinGet in this user and system.
-$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' +
-            [Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
-            (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links') + ';' +
-            (Join-Path $env:USERPROFILE '.local\bin')
+# Refresh persisted paths without discarding process-only entries or precedence.
+$pathEntries = [System.Collections.Generic.List[string]]::new()
+foreach ($pathSource in @(
+    $env:Path,
+    [Environment]::GetEnvironmentVariable('Path','Machine'),
+    [Environment]::GetEnvironmentVariable('Path','User'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'),
+    (Join-Path $env:USERPROFILE '.local\bin')
+)) {
+    foreach ($entry in ($pathSource -split ';')) {
+        if ($entry -and $entry -notin $pathEntries) { $pathEntries.Add($entry) }
+    }
+}
+$env:Path = $pathEntries -join ';'
 & (Join-Path $PSScriptRoot 'Install-OMP.ps1')
 & (Join-Path $PSScriptRoot 'Configure-Desktop.ps1')
 & (Join-Path $PSScriptRoot 'Install-Skills.ps1')
