@@ -11,6 +11,8 @@ function Assert-True($Condition, [string]$Message) {
 }
 function Reset-Fixture {
     $WindowsUpdateTestFixture.SearchResultCode = 2
+    $WindowsUpdateTestFixture.DownloadResultCode = 2
+    $WindowsUpdateTestFixture.InstallResultCode = 2
     $WindowsUpdateTestFixture.InstallerBusy = $false
     $WindowsUpdateTestFixture.RestartBeforeInstall = $false
     $WindowsUpdateTestFixture.PendingRestart = $false
@@ -55,7 +57,7 @@ function New-Object {
                 $downloader = [pscustomobject]@{ Updates = $null }
                 $downloader | Add-Member ScriptMethod Download {
                     $WindowsUpdateTestFixture.DownloadCalls++
-                    return [pscustomobject]@{ ResultCode = 2 }
+                    return [pscustomobject]@{ ResultCode = $WindowsUpdateTestFixture.DownloadResultCode }
                 }
                 return $downloader
             }
@@ -68,7 +70,7 @@ function New-Object {
                 $installer | Add-Member ScriptMethod Install {
                     $WindowsUpdateTestFixture.InstallCalls++
                     return [pscustomobject]@{
-                        ResultCode = 2
+                        ResultCode = $WindowsUpdateTestFixture.InstallResultCode
                         RebootRequired = $WindowsUpdateTestFixture.InstallRestart
                     }
                 }
@@ -138,4 +140,35 @@ foreach ($condition in @('InstallerBusy', 'RestartBeforeInstall')) {
     Assert-True $caught "Installer precondition $condition must stop with recovery guidance."
     Assert-True ($WindowsUpdateTestFixture.DownloadCalls -eq 1 -and $WindowsUpdateTestFixture.InstallCalls -eq 0) 'New precondition after download must prevent installation.'
 }
-Write-Host 'Eight mocked Windows Update runtime cases passed; no Windows Update operation ran.' 
+# Deferred names must survive an unrelated download failure.
+Reset-Fixture
+$WindowsUpdateTestFixture.OfferedUpdates = @((New-FixtureUpdate 'Regular'), (New-FixtureUpdate 'Deferred exclusive' 2))
+$WindowsUpdateTestFixture.DownloadResultCode = 4
+$warnings = @()
+$caught = $false
+try { & $target -WarningVariable warnings 3>$null } catch { $caught = $_.Exception.Message -like '*download did not fully succeed*' }
+Assert-True $caught 'Failed download must still stop the stage.'
+Assert-True (($warnings | Out-String) -like '*Deferred exclusive*') 'Deferred names must be shown before download failure.'
+Assert-True ($WindowsUpdateTestFixture.InstallCalls -eq 0) 'Failed download must not install.'
+
+# A partially successful install may also require a restart. Retain both facts.
+Reset-Fixture
+$WindowsUpdateTestFixture.OfferedUpdates = @((New-FixtureUpdate 'Regular'))
+$WindowsUpdateTestFixture.InstallResultCode = 3
+$WindowsUpdateTestFixture.InstallRestart = $true
+$caught = $false
+try { & $target } catch {
+    $caught = $_.Exception.Message -like '*installation did not fully succeed*Restart Windows before retrying*'
+}
+Assert-True $caught 'Partial install with restart must report both failure and restart guidance.'
+
+Reset-Fixture
+$WindowsUpdateTestFixture.OfferedUpdates = @((New-FixtureUpdate 'Regular'))
+$WindowsUpdateTestFixture.InstallResultCode = 4
+$caught = $false
+try { & $target } catch {
+    $caught = $_.Exception.Message -like '*installation did not fully succeed*' -and $_.Exception.Message -notlike '*Restart Windows before retrying*'
+}
+Assert-True $caught 'Failed install without restart must not invent a restart requirement.'
+Write-Host 'Eleven mocked Windows Update runtime cases passed; no Windows Update operation ran.'  
+
