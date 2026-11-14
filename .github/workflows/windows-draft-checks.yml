@@ -16,6 +16,12 @@ jobs:
       - name: Parse PowerShell without executing installers
         shell: pwsh
         run: ./windows/test-powershell.ps1
+      - name: Execute launcher binding test (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/test-launcher-binding.ps1
+      - name: Execute launcher binding test (PowerShell 7)
+        shell: pwsh
+        run: ./windows/test-launcher-binding.ps1
       - name: Run isolated Python tests
         shell: pwsh
         run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
