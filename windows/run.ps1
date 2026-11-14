@@ -1,4 +1,6 @@
 # Short-entry launcher. Run from an elevated PowerShell on the Windows PC.
+# Isolate parameters from the caller when invoked through Invoke-Expression.
+& {
 [CmdletBinding()]
 param(
     [ValidateSet('NvidiaSingle','NvidiaDual','Intel')][string]$Hardware,
@@ -43,7 +45,7 @@ New-Item -ItemType Directory -Path $dir | Out-Null
 try {
     $archive = Join-Path $dir 'setup.zip'
     $unpacked = Join-Path $dir 'files'
-    Invoke-WebRequest -Uri 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive
     Expand-Archive -LiteralPath $archive -DestinationPath $unpacked
     $setup = Join-Path $unpacked 'ubuntu-PC-setup-main\windows\Setup.ps1'
     if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Downloaded archive does not contain Windows setup.' }
@@ -52,3 +54,5 @@ try {
 } finally {
     Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+} @args
