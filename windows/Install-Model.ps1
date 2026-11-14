@@ -8,20 +8,24 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 # Upstream --no-start completes preparation before returning; downloading a 58 GB
 # model must not consume the endpoint startup timeout.
+function Assert-XeStrataIdle {
+    # A matching executable does not prove model identity. Never reuse or stop an
+    # existing server/setup, even if its API happens to answer on the desired port.
+    if (@(Get-Process -Name 'xestrata-cli' -ErrorAction SilentlyContinue).Count -gt 0) {
+        throw 'XeStrata is already running or preparing a model. Leave it running, or close it yourself before retrying; this setup will not change or duplicate it.'
+    }
+    $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq 8095 })
+    if ($listeners.Count -gt 0) {
+        throw 'Port 8095 is already in use. This setup cannot verify the model there and will not modify or reuse that server.'
+    }
+}
 function Start-XeStrataModel {
     param([Parameter(Mandatory=$true)][string]$Executable)
-    $running = @(Get-Process -Name 'xestrata-cli' -ErrorAction SilentlyContinue | Where-Object {
-        if (-not $_.Path) { throw 'Cannot identify an existing XeStrata process; close it before retrying.' }
-        $_.Path -eq $Executable
-    })
-    if ($running.Count -gt 1) { throw 'Multiple XeStrata processes are already running; resolve them before retrying.' }
-    if ($running.Count -eq 1) {
-        Write-Host 'XeStrata is already running or preparing its model; not starting a duplicate.'
-        return $running[0]
-    }
+    Assert-XeStrataIdle
     Write-Host 'Preparing XeStrata Gyro-S. The large download may take hours; progress appears below.'
     & $Executable --setup --family gyro --model Gyro-S --context 32768 --vision no --yes --no-start | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "XeStrata preparation failed (exit $LASTEXITCODE). Rerun after correcting the reported error." }
+    Assert-XeStrataIdle
     # --model would enter setup again. Upstream --yes starts the newest saved config,
     # which the synchronous Gyro-S preparation above just wrote.
     return Start-Process -FilePath $Executable -ArgumentList @('--yes','--port','8095') -PassThru
@@ -98,5 +102,5 @@ while ([DateTime]::UtcNow -lt $deadline) {
         break
     } catch { Start-Sleep -Seconds 5 }
 }
-if (-not $ready) { throw "Model endpoint on $port did not become ready within $ModelReadyTimeoutMinutes minutes. A preparation already in progress was left running; do not launch another copy. Inspect the model window, then rerun this stage or Connect-LocalModel.ps1 -Port $port when ready." }
+if (-not $ready) { throw "Model endpoint on $port did not become ready within $ModelReadyTimeoutMinutes minutes. The process was left running; do not launch another copy. Inspect the model window, then rerun this stage or Connect-LocalModel.ps1 -Port $port when ready." }
 & (Join-Path $PSScriptRoot 'Connect-LocalModel.ps1') -Port $port
