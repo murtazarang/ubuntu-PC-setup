@@ -11,25 +11,26 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('ai-regression-' + [guid]::NewGuid
 $originalPath = $env:Path
 try {
     New-Item -ItemType Directory -Path $work | Out-Null
-    $skills = Read-SourceAst 'Install-Skills.ps1'
-    $priorAssignment = $skills.Find({ param($node)
-        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -eq '$prior'
-    }, $true)
-    if (-not $priorAssignment) { throw 'Missing rules read statement.' }
+    $null = Read-SourceAst 'Install-Skills.ps1'
+    $skillsSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Install-Skills.ps1'))
+    $rulesBlock = [regex]::Match($skillsSource, '(?ms)^# BEGIN existing-rules initialization[^\r\n]*\r?\n(.*?)^# END existing-rules initialization')
+    if (-not $rulesBlock.Success) { throw 'Missing bounded rules initialization block.' }
     $rules = Join-Path $work 'RULES.md'
-    [IO.File]::WriteAllText($rules, '')
-    Write-Host ('Rules assignment AST: ' + $priorAssignment.Extent.Text)
-    Write-Host ('Read commands: ' + ((Get-Command Get-Content,Test-Path,Invoke-Expression | ForEach-Object { $_.Name + ':' + $_.CommandType + ':' + $_.Source }) -join '; '))
-    Write-Host ('Rules file byte length: ' + ([IO.FileInfo]$rules).Length)
+    foreach ($expected in @('', 'existing rules')) {
+        [IO.File]::WriteAllText($rules, $expected)
+        $prior = 'UNASSIGNED-marker'
+        Invoke-Expression $rulesBlock.Groups[1].Value
+        if ($null -eq $prior -or $prior -cne $expected) {
+            Write-Host ('Rules initialization source: ' + $rulesBlock.Groups[1].Value)
+            Write-Host ('Expected JSON: ' + (ConvertTo-Json -InputObject $expected -Compress))
+            Write-Host ('Actual JSON: ' + (ConvertTo-Json -InputObject $prior -Compress))
+            throw 'Existing RULES.md content was not read unchanged.'
+        }
+    }
+    Remove-Item -LiteralPath $rules
     $prior = 'UNASSIGNED-marker'
-    Invoke-Expression $priorAssignment.Extent.Text
-    Write-Host ('Rules result JSON: ' + (ConvertTo-Json -InputObject $prior -Compress))
-    Write-Host ('Rules null identity: ' + [object]::ReferenceEquals($null, $prior))
-    if ($null -ne $prior) { Write-Host ('Rules result type: ' + $prior.GetType().FullName) }
-    if ($null -eq $prior -or $prior.Contains('marker')) { throw 'Empty RULES.md was not normalized.' }
-    [IO.File]::WriteAllText($rules, 'existing rules')
-    Invoke-Expression $priorAssignment.Extent.Text
-    if ($prior -ne 'existing rules') { throw 'Existing rules changed during read.' }
+    Invoke-Expression $rulesBlock.Groups[1].Value
+    if ($null -eq $prior -or $prior -cne '') { throw 'Missing RULES.md did not initialize an empty string.' }
 
     foreach ($name in @('Install-OMP.ps1', 'Install-Model.ps1')) {
         $tree = Read-SourceAst $name
