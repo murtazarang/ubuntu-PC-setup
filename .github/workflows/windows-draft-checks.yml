@@ -70,6 +70,9 @@ jobs:
           ./windows/tests/test-reference.ps1
           ./windows/tests/test-desktop-discovery.ps1
           ./windows/tests/test-firefox-scope.ps1
+      - name: Test Firefox installer selection
+        shell: pwsh
+        run: ./windows/tests/test-firefox-installer-type.ps1
       - name: Test effective OMP model reporting
         shell: pwsh
         run: ./windows/test-model-effective.ps1
