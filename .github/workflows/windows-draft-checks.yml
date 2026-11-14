@@ -1,0 +1,21 @@
+name: Windows draft checks
+on:
+  push:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-draft-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safe-checks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Parse PowerShell without executing installers
+        shell: pwsh
+        run: ./windows/test-powershell.ps1
+      - name: Run isolated Python tests
+        shell: pwsh
+        run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
