@@ -4,17 +4,35 @@ Independent Windows setup for USB **1908:0102**. It does not require AIDA64, cha
 
 This adapts the **existing dark gauge dashboard** from [mechcow/win-ax206-display](https://github.com/mechcow/win-ax206-display/blob/11280756789f1d61b80b49383b255acde62a9c60/themes/default.yaml), rearranging its temperature gauges into a 320×480 portrait layout. CPU and GPU temperatures, their load percentages, RAM usage and a clock fit the small screen. Theme and software license: GPL-2.0-or-later; full license included. This is a small source-based upstream project, not a commercial turnkey driver.
 
-## Run
+## Install and start directly from GitHub
 
-Use Windows PowerShell or PowerShell 7 in this folder. Use **Run as administrator** for full hardware sensor access. `uv` from the existing PC setup must be available; if not, use [its official Windows installation instructions](https://docs.astral.sh/uv/getting-started/installation/), then reopen the terminal.
+On the **Ryzen 5700G / single RTX 3080 PC**, open Windows PowerShell or PowerShell 7 **as administrator** for hardware sensor access and paste this one line. No Git installation, clone or manual file download is needed:
 
 ```powershell
-.\Setup.ps1
-.\Run.ps1 -Action Info
-.\Run.ps1 -Action TestPattern
-.\Run.ps1 -Action Sensors
-.\Run.ps1 -Rotation 270
+irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1 | iex
 ```
+
+This downloads the current repository snapshot, runs only this display's setup, and starts the portrait dashboard. It executes code from this repository. `uv` from the existing PC setup must be available; otherwise use [its official Windows installation instructions](https://docs.astral.sh/uv/getting-started/installation/), then reopen PowerShell. The launcher requires only Windows PowerShell 5.1 or newer, not PowerShell 7.
+
+The launcher is named `install.ps1`, distinct from the existing `Run.ps1` because Windows filenames are case-insensitive. It retains its downloaded setup under `%LOCALAPPDATA%\AX206Panel\setup-runs`, copies the runner to `%LOCALAPPDATA%\AX206Panel\Run.ps1`, and preserves your existing `portrait.yaml`. Rerunning setup reuses the existing Python environment and upstream libraries; it still checks Python dependencies. It does not install or change USB drivers or PawnIO.
+
+For setup without starting the screen, or to pass a different rotation, use the parameterized form:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1))) -SetupOnly
+# Alternatively replace -SetupOnly with -Rotation 90 if the picture is upside down.
+```
+
+After setup, start again or diagnose the display without downloading anything:
+
+```powershell
+& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Info
+& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action TestPattern
+& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Sensors
+& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Rotation 270
+```
+
+If you already have a local copy of this folder, `.\Setup.ps1` followed by `.\Run.ps1` still works. A custom `-InstallDir` is accepted by the launcher, setup and runner; use the same directory each time. The launcher prints exact restart and diagnostic commands for your chosen directory.
 
 1. Setup downloads a pinned upstream source archive, uses uv to create a dedicated Python 3.11 environment, and downloads the LibreHardwareMonitor .NET libraries through upstream's NuGet helper. It reuses an existing environment and libraries on rerun. It does **not** reinstall PawnIO. Dependencies are constrained by upstream, not fully locked; NuGet chooses its latest stable library on the first successful setup.
 2. **Info reads the actual resolution from the USB display.** A reported 480×320 needs rotation 90 or 270. The default **270** rotates the framebuffer clockwise to compensate for your portrait-left mounting (the original landscape right edge is at the top). If the result is upside down, quit with Ctrl+C and use `-Rotation 90`. A device reporting 320×480 uses 0 or 180. Other sizes deliberately fail rather than stretch the dashboard.
@@ -23,7 +41,7 @@ Use Windows PowerShell or PowerShell 7 in this folder. Use **Run as administrato
 
 For a preview without USB writes:
 ```powershell
-.\Run.ps1 -Action Preview
+& "$env:LOCALAPPDATA\AX206Panel\Run.ps1" -Action Preview
 ```
 This saves `%LOCALAPPDATA%\AX206Panel\preview.png` using **synthetic demonstration readings**, not live temperatures. You can edit `%LOCALAPPDATA%\AX206Panel\portrait.yaml`; rerunning Setup preserves that theme. Restart the panel after editing. `-InstallDir` is supported on both scripts; use the same path for each.
 
@@ -33,11 +51,11 @@ Follow [upstream's driver instructions](https://github.com/mechcow/win-ax206-dis
 
 ## Sensor limitations
 
-Missing values display `--`. CPU temperature is upstream's selected package/core measurement, not every individual core. Upstream prefers NVIDIA over AMD over Intel for its generic GPU keys. **Its sensor mapping does not preserve separate identities for two GPUs of the same vendor.** This runner hides GPU values in that case rather than combine readings from your dual RTX3060s; CPU/RAM still work. It does not yet provide a trustworthy dual-GPU dashboard. View `-Action Sensors` for the raw hardware listing. Intel ARC sensor availability depends on what LibreHardwareMonitor exposes on that machine.
+Missing values display `--`. CPU temperature is upstream's selected package/core measurement, not every individual core. Upstream prefers NVIDIA over AMD over Intel for its generic GPU keys. **Its sensor mapping does not preserve separate identities for two GPUs of the same vendor.** This runner hides GPU values in that case rather than combine readings from a dual-RTX-3060 system; CPU/RAM still work. It does not yet provide a trustworthy dual-GPU dashboard. View `-Action Sensors` for the raw hardware listing. Intel ARC sensor availability depends on what LibreHardwareMonitor exposes on that machine.
 
 ## Verification and sources
 
-Locally verified: four isolated Python tests covering rotation corner placement, native portrait dimensions, rejection of unsupported resolution and suppression of ambiguous same-vendor GPU readings; synthetic rendering with the pinned upstream renderer. **No Windows installer, USB transfer, PawnIO access, or real temperature readings were tested here.** No claim of end-to-end hardware validation.
+Locally verified: six isolated Python tests covering rotation corner placement, native portrait dimensions, rejection of unsupported resolution, suppression of ambiguous same-vendor GPU readings and cleanup on failure; synthetic rendering with the pinned upstream renderer. **No Windows installer, USB transfer, PawnIO access, or real temperature readings were tested here.** No claim of end-to-end hardware validation.
 
 ```powershell
 & "$env:LOCALAPPDATA\AX206Panel\.venv\Scripts\python.exe" -m unittest discover -s .\tests -v
