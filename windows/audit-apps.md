@@ -1,3 +1,5 @@
+> Historical audit note: FanControl and Mailspring were subsequently removed from the Windows setup at the user's request. Mentions below record the earlier review, not the current install list.
+
 # Independent command audit: applications, desktop, Firefox, Everything
 
 Audit date: 2026-11-14. This ledger describes the files as read during this review, before subsequent fixes. It is **not a Windows execution certificate**. No installers, services, registry writes, or browser policies were executed. Line ranges refer to the reviewed copies. `V` means the named upstream interface/argument was checked, `I` means code inspected only, `U` means unresolved behavior or missing direct verification. A row can have both V and U: valid syntax does not establish successful installation.
