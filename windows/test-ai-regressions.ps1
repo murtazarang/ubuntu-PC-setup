@@ -18,7 +18,14 @@ try {
     if (-not $priorAssignment) { throw 'Missing rules read statement.' }
     $rules = Join-Path $work 'RULES.md'
     [IO.File]::WriteAllText($rules, '')
+    Write-Host ('Rules assignment AST: ' + $priorAssignment.Extent.Text)
+    Write-Host ('Read commands: ' + ((Get-Command Get-Content,Test-Path,Invoke-Expression | ForEach-Object { $_.Name + ':' + $_.CommandType + ':' + $_.Source }) -join '; '))
+    Write-Host ('Rules file byte length: ' + ([IO.FileInfo]$rules).Length)
+    $prior = 'UNASSIGNED-marker'
     Invoke-Expression $priorAssignment.Extent.Text
+    Write-Host ('Rules result JSON: ' + (ConvertTo-Json -InputObject $prior -Compress))
+    Write-Host ('Rules null identity: ' + [object]::ReferenceEquals($null, $prior))
+    if ($null -ne $prior) { Write-Host ('Rules result type: ' + $prior.GetType().FullName) }
     if ($null -eq $prior -or $prior.Contains('marker')) { throw 'Empty RULES.md was not normalized.' }
     [IO.File]::WriteAllText($rules, 'existing rules')
     Invoke-Expression $priorAssignment.Extent.Text
