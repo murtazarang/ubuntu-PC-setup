@@ -21,12 +21,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP installation failed.' }
     $bridge = Join-Path $env:UV_TOOL_BIN_DIR 'openzim-mcp.exe'
     if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) { throw 'OpenZIM executable was not installed.' }
+    Write-Host 'Checking OpenZIM MCP startup (--help); this does not download Wikipedia.'
     & $bridge --help | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'OpenZIM MCP startup check failed.' }
 } finally {
     $env:UV_TOOL_DIR = $oldToolDir
     $env:UV_TOOL_BIN_DIR = $oldToolBinDir
 }
+Write-Host 'Locating Oh My Pi configuration directory.'
 $agentDir = (& $omp config path | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to find OMP configuration directory.' }
 $paseoHome = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE '.paseo' }
@@ -36,6 +38,7 @@ $final = Join-Path $ArchiveDirectory $name
 $part = "$final.part"
 # Kiwix publishes SHA-256 sidecars. Fetch afresh, never trust a stale checksum.
 $checksum = "$final.sha256.download"
+Write-Host 'Fetching the official Wikipedia SHA-256 checksum from Kiwix.'
 & curl.exe --fail --location --retry 3 --output $checksum "https://download.kiwix.org/zim/wikipedia/$name.sha256"
 if ($LASTEXITCODE -ne 0) { throw 'Could not obtain official Wikipedia checksum; archive not registered.' }
 $checksumText = (Get-Content -LiteralPath $checksum -Raw).Trim()
@@ -56,11 +59,13 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     & curl.exe --fail --location --retry 3 --continue-at - --output $part "https://download.kiwix.org/zim/wikipedia/$name"
     if ($LASTEXITCODE -ne 0) { throw 'Wikipedia download failed; rerun this script to resume.' }
     if ((Get-Item -LiteralPath $part).Length -lt 40GB) { throw 'Wikipedia archive is unexpectedly small; refusing to mark complete.' }
+    Write-Host 'Verifying the downloaded Wikipedia archive SHA-256; this may take several minutes without a progress bar.'
     if ((Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash -ne $expectedHash) {
         throw "Wikipedia checksum mismatch. Partial file retained at $part; remove it before retrying a fresh download."
     }
     Move-Item -LiteralPath $part -Destination $final
 } else {
+    Write-Host 'Verifying the existing Wikipedia archive SHA-256; this may take several minutes without a progress bar.'
     if ((Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash -ne $expectedHash) {
         throw "Existing archive checksum mismatch: $final. File preserved; repair or move it before rerunning."
     }
@@ -70,3 +75,4 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
 if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP and Paseo.' }
 
 Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP and Paseo."
+
