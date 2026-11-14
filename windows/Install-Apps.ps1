@@ -28,7 +28,16 @@ function Test-DirectAppInstalled([string]$DisplayNamePattern) {
 # SignalRGB documents this per-user launcher as its installed executable.
 # https://docs.signalrgb.com/guides/installation-setup/file-locations/
 function Test-SignalRgbInstalled {
-    return Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'VortxEngine\SignalRgbLauncher.exe') -PathType Leaf
+    foreach ($engine in @('VortexEngine', 'VortxEngine')) {
+        $root = Join-Path $env:LOCALAPPDATA $engine
+        if (Test-Path -LiteralPath (Join-Path $root 'SignalRgbLauncher.exe') -PathType Leaf) { return $true }
+        foreach ($version in @(Get-ChildItem -LiteralPath $root -Directory -Filter 'app-*' -ErrorAction SilentlyContinue)) {
+            foreach ($relative in @('SignalRgb.exe', 'Signal-x64\SignalRgb.exe', 'SignalRgbLauncher.exe')) {
+                if (Test-Path -LiteralPath (Join-Path $version.FullName $relative) -PathType Leaf) { return $true }
+            }
+        }
+    }
+    return $false
 }
 function Run-Installer([string]$Uri, [string]$Name, [string]$ExpectedSha256 = '', [string]$DisplayNamePattern, [switch]$SignalRgb) {
     if (-not $DisplayNamePattern) { throw 'An application detection pattern is required.' }
