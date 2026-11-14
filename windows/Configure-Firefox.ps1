@@ -3,6 +3,18 @@
 param([switch]$Release)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# A distribution policy reaches every profile using this Firefox installation.
+# Do not infer that another user's redirected/custom Firefox profiles are absent.
+# Special excludes system-service profiles per Win32_UserProfile documentation.
+# https://learn.microsoft.com/en-us/previous-versions/windows/desktop/userprofileprov/win32-userprofile
+if (-not $Release) {
+    $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $otherProfiles = @(Get-CimInstance -ClassName Win32_UserProfile -ErrorAction Stop |
+        Where-Object { -not $_.Special -and $_.SID -ne $currentSid })
+    if ($otherProfiles.Count -gt 0) {
+        throw 'Other Windows user profiles exist. No Firefox policies were changed: this installation-wide policy could replace their uBlock filters. Configure the requested extensions and filters in your own Firefox dashboard instead. Release-only remains available for a previous setup.'
+    }
+}
 $uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
 # WinGet may preserve an existing per-user, x86 or custom-path installation.
 $candidates = @()
