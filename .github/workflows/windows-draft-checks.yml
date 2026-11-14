@@ -31,6 +31,9 @@ jobs:
       - name: Execute mocked application detection tests
         shell: pwsh
         run: ./windows/test-app-detection.ps1
+      - name: Execute mocked Everything tests
+        shell: pwsh
+        run: ./windows/tests/test-everything.ps1
       - name: Run isolated Python tests
         shell: pwsh
         run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
