@@ -57,3 +57,5 @@ try { & $target; throw 'Expected package failure.' } catch {
 }
 if ($EverythingTestFixture.Packages.Count -ne 1 -or $EverythingTestFixture.Commands.Count -ne 0) { throw 'Continued after package failure.' }
 Write-Host 'Four mocked Everything installation cases passed; no installer or service was run.'
+
+$global:LASTEXITCODE = 0 # Failed native-command fixture must not fail the successful test process.
