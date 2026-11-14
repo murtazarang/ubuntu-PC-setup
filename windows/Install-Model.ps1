@@ -1,9 +1,32 @@
 # Set up a local model on the requested NVIDIA or Intel GPU.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][ValidateSet('NvidiaSingle','NvidiaDual','Intel')][string]$Hardware)
+param(
+    [Parameter(Mandatory=$true)][ValidateSet('NvidiaSingle','NvidiaDual','Intel')][string]$Hardware,
+    [ValidateRange(1,1440)][int]$ModelReadyTimeoutMinutes = 30
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
+# Upstream --no-start completes preparation before returning; downloading a 58 GB
+# model must not consume the endpoint startup timeout.
+function Start-XeStrataModel {
+    param([Parameter(Mandatory=$true)][string]$Executable)
+    $running = @(Get-Process -Name 'xestrata-cli' -ErrorAction SilentlyContinue | Where-Object {
+        if (-not $_.Path) { throw 'Cannot identify an existing XeStrata process; close it before retrying.' }
+        $_.Path -eq $Executable
+    })
+    if ($running.Count -gt 1) { throw 'Multiple XeStrata processes are already running; resolve them before retrying.' }
+    if ($running.Count -eq 1) {
+        Write-Host 'XeStrata is already running or preparing its model; not starting a duplicate.'
+        return $running[0]
+    }
+    Write-Host 'Preparing XeStrata Gyro-S. The large download may take hours; progress appears below.'
+    & $Executable --setup --family gyro --model Gyro-S --context 32768 --vision no --yes --no-start | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "XeStrata preparation failed (exit $LASTEXITCODE). Rerun after correcting the reported error." }
+    # --model would enter setup again. Upstream --yes starts the newest saved config,
+    # which the synchronous Gyro-S preparation above just wrote.
+    return Start-Process -FilePath $Executable -ArgumentList @('--yes','--port','8095') -PassThru
+}
+$xe = $null
 if ($Hardware -like 'Nvidia*') {
     $smi = Get-Command nvidia-smi.exe -CommandType Application -ErrorAction Stop
     $gpus = @(& $smi.Source --query-gpu=index --format=csv,noheader)
@@ -57,19 +80,23 @@ if ($Hardware -like 'Nvidia*') {
     $cliExecutables = @(Get-ChildItem -Path $appRoot -Filter 'xestrata-cli.exe' -File -Recurse -ErrorAction SilentlyContinue)
     if ($cliExecutables.Count -ne 1) { throw "Expected one XeStrata CLI executable under $appRoot; found $($cliExecutables.Count)." }
     $exe = $cliExecutables[0].FullName
-    # Upstream's Windows CLI accepts the package's normal setup options.
-    $xe = Start-Process -FilePath $exe -ArgumentList @('--setup','--family','gyro','--model','Gyro-S','--context','32768','--vision','no','--yes') -PassThru
-    Write-Host 'XeStrata is preparing its model in a separate window. Follow any prompts there.'
+    $xe = Start-XeStrataModel -Executable $exe
+    Write-Host 'XeStrata runs in a separate window. Keep that window open while using the model.'
     $port = '8095'
 }
-# The first load can take several minutes.
+# This timeout begins after preparation, not while downloading the model.
 $ready = $false
-for ($i = 0; $i -lt 180; $i++) {
+$deadline = [DateTime]::UtcNow.AddMinutes($ModelReadyTimeoutMinutes)
+while ([DateTime]::UtcNow -lt $deadline) {
+    if ($null -ne $xe) {
+        $xe.Refresh()
+        if ($xe.HasExited) { throw "XeStrata exited before readiness (exit $($xe.ExitCode)); inspect its window/logs before retrying." }
+    }
     try {
         $null = Invoke-RestMethod -Uri "http://127.0.0.1:$port/v1/models" -TimeoutSec 3
         $ready = $true
         break
     } catch { Start-Sleep -Seconds 5 }
 }
-if (-not $ready) { throw "Model endpoint on $port did not become ready. Start it and rerun Connect-LocalModel.ps1 -Port $port." }
+if (-not $ready) { throw "Model endpoint on $port did not become ready within $ModelReadyTimeoutMinutes minutes. A preparation already in progress was left running; do not launch another copy. Inspect the model window, then rerun this stage or Connect-LocalModel.ps1 -Port $port when ready." }
 & (Join-Path $PSScriptRoot 'Connect-LocalModel.ps1') -Port $port
