@@ -28,3 +28,5 @@ foreach ($raw in @('garbage','{}','{"installed":null}','{"installed":{}}','{"ins
 }
 $script:Raw='{"installed":[]}'; $script:Exit=1; Assert-Throws
 Write-Host 'XeStrata model inventory tests passed.'
+
+$global:LASTEXITCODE = 0 # Clear the intentional failure fixture after assertions pass.
