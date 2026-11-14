@@ -44,17 +44,17 @@ supplied SignalRGB installer. These
 installers may display their own prompts. Steam games use native Windows
 graphics APIs; no Proton is needed. PowerToys Run targets Win+F2, PowerToys
 Awake provides an on-demand keep-awake switch, and Windows clipboard history
-uses Win+V. Everything and the EverythingPowerToys plugin provide indexed search in PowerToys Run; actual integration still needs a Windows smoke test. User-level data and the separate HDD are not modified by design.
+uses Win+V. Everything and the EverythingPowerToys plugin provide indexed search in PowerToys Run; actual integration still needs a Windows smoke test. The setup changes the current user's application settings; the separate HDD is not formatted.
 
 Oh My Pi is configured to use the complete scientific, scientific-writer and
-Education Agent Skills libraries and the locally cached OpenZIM MCP bridge.
+Education Agent Skills libraries and a dedicated locally installed OpenZIM MCP bridge. The Wikipedia archive is checked against Kiwix's SHA-256 before registration.
 The full English June 2026 Wikipedia text-only ZIM requires about 49 GiB.
 The model and archive together can need well over 120 GiB of available SSD
 space. To place the archive elsewhere pass `-ArchiveDirectory D:\YourFolder`
 to the Desktop stage. An interrupted archive download can be resumed by
 rerunning `Install-Reference.ps1` with the same directory.
 
-Firefox uses managed add-on policies. Existing uBlock profiles are protected from automatic filter replacement; review the script output if an existing profile is detected. After first launch, let the three extensions
+Firefox uses installation-wide managed add-on policies. To avoid changing another Windows user's Firefox, initialization stops if it detects another ordinary Windows profile; unregistered custom Firefox profiles may not be detected. Existing uBlock profiles are protected from automatic filter replacement; review the script output if an existing profile is detected. After first launch, let the three extensions
 load, close Firefox and run `./Configure-Firefox.ps1 -Release` from an elevated
 terminal. This removes the one-time enforced filter-list values so later user
 edits persist; the advanced Twitch resource URL remains managed.
@@ -69,9 +69,7 @@ extensions and settings, Win+F2, Win+V, Awake, SignalRGB and Steam.
 None of these hardware, GUI, installer, archive download, or end-to-end AI tests
 has been run by the author of these scripts.
 
-The eleven Python unit tests check configuration merges in isolation only:
-`python -m unittest discover -s windows/tests`. They do not exercise PowerShell,
-installers or actual Windows. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
+Python tests check configuration merges in isolation; mocked PowerShell tests run in Windows CI. Neither executes real installers, GPU inference, Firefox, or a full offline MCP query. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
 [OMP](https://github.com/can1357/oh-my-pi), [Strata](https://github.com/Niko1221/Strata),
 [XeStrata](https://github.com/MistVVK/XeStrata),
 [PowerToys DSC](https://learn.microsoft.com/en-us/windows/powertoys/dsc-configure/microsoft-dsc).
