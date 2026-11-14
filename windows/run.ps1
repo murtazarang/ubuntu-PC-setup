@@ -1,4 +1,9 @@
 # Short-entry launcher. Run from an elevated PowerShell on the Windows PC.
+[CmdletBinding()]
+param(
+    [ValidateSet('NvidiaSingle','NvidiaDual','Intel')][string]$Hardware,
+    [ValidateSet('Drivers','Desktop')][string]$Stage
+)
 $ErrorActionPreference = 'Stop'
 if ($env:OS -ne 'Windows_NT') { throw 'This launcher requires Windows.' }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -6,20 +11,24 @@ $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Open PowerShell as administrator and run the launcher again.'
 }
-Write-Host 'Choose your PC:'
-Write-Host '1. RTX 3080    2. Intel Arc B580    3. Two RTX 3060s'
-switch (Read-Host 'Enter 1, 2, or 3') {
-    '1' { $hardware = 'NvidiaSingle' }
-    '2' { $hardware = 'Intel' }
-    '3' { $hardware = 'NvidiaDual' }
-    default { throw 'Invalid PC choice; nothing was installed.' }
+if (-not $Hardware) {
+    Write-Host 'Choose your PC:'
+    Write-Host '1. RTX 3080    2. Intel Arc B580    3. Two RTX 3060s'
+    switch (Read-Host 'Enter 1, 2, or 3') {
+        '1' { $Hardware = 'NvidiaSingle' }
+        '2' { $Hardware = 'Intel' }
+        '3' { $Hardware = 'NvidiaDual' }
+        default { throw 'Invalid PC choice; nothing was installed.' }
+    }
 }
-Write-Host 'Choose a stage:'
-Write-Host '1. Windows updates and GPU vendor app    2. Desktop setup (after reboot)'
-switch (Read-Host 'Enter 1 or 2') {
-    '1' { $stage = 'Drivers' }
-    '2' { $stage = 'Desktop' }
-    default { throw 'Invalid stage choice; nothing was installed.' }
+if (-not $Stage) {
+    Write-Host 'Choose a stage:'
+    Write-Host '1. Windows updates and GPU vendor app    2. Desktop setup (after reboot)'
+    switch (Read-Host 'Enter 1 or 2') {
+        '1' { $Stage = 'Drivers' }
+        '2' { $Stage = 'Desktop' }
+        default { throw 'Invalid stage choice; nothing was installed.' }
+    }
 }
 $pwsh = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue
 if (-not $pwsh) {
