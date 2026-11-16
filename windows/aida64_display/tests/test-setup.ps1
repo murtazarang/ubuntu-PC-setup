@@ -14,7 +14,7 @@ $isolated = $isolated.Replace('$PSScriptRoot', '$script:Assets')
 $isolated = $isolated.Replace("& (Join-Path `$script:Assets 'autostart.ps1')", 'Invoke-FakeAutostart')
 $script:Code = [scriptblock]::Create($isolated)
 $script:StartupCalls=0
-function Invoke-FakeAutostart { param($InstallDir,$Rotation) $script:StartupCalls++ }
+function Invoke-FakeAutostart { param($InstallDir,$Rotation) $script:StartupCalls++; $script:RotationPassed = $PSBoundParameters.ContainsKey('Rotation') }
 $script:Events = [System.Collections.Generic.List[string]]::new()
 $script:UvFails = $false
 $script:UvMissing = $false
@@ -57,6 +57,12 @@ try {
     Assert-True ((Get-Content -LiteralPath (Join-Path $install 'portrait.yaml') -Raw).Trim() -eq 'CUSTOM THEME MUST SURVIVE') 'Custom theme was overwritten.'
     Assert-True (Test-Path -LiteralPath (Join-Path $install 'panel.py')) 'Runner not copied.'
     Assert-True ($script:StartupCalls -eq 1) 'Setup did not register default startup.'
+    Assert-True (-not $script:RotationPassed) 'Default rerun must preserve the registered rotation.'
+    foreach ($name in @('power_events.py','usb_transport.py','Run.ps1','autostart.ps1')) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $install $name)) "Missing durable program file $name"
+    }
+    & $script:Code -InstallDir $install -Rotation 90
+    Assert-True $script:RotationPassed 'Explicit rotation did not reach startup helper.'
 
     $script:Events.Clear()
     Remove-Item -LiteralPath $script:Dll

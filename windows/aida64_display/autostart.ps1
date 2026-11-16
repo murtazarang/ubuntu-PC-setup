@@ -30,6 +30,12 @@ if ($existing.Count -gt 0) {
         throw "A different task named $taskName already exists. It has not been changed. Inspect it in Task Scheduler."
     }
 }
+# An ordinary setup rerun preserves the rotation already registered for this user.
+# Only an explicitly supplied different rotation asks for a configuration change.
+if ($existing.Count -gt 0 -and -not $PSBoundParameters.ContainsKey('Rotation')) {
+    $Rotation = [int]([regex]::Match($existing[0].Actions[0].Arguments, '(0|90|180|270)$').Value)
+    $arguments = '"' + $runner + '" --rotation ' + $Rotation
+}
 if ($Action -eq 'Status') {
     if ($existing.Count) { $existing[0] | Select-Object TaskName,State,Actions }
     else { Write-Host 'AX206 sign-in startup is not enabled.' }

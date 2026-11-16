@@ -4,7 +4,7 @@ Independent Windows setup for USB **1908:0102**. It does not require AIDA64, cha
 
 This adapts the **existing dark gauge dashboard** from [mechcow/win-ax206-display](https://github.com/mechcow/win-ax206-display/blob/11280756789f1d61b80b49383b255acde62a9c60/themes/default.yaml), rearranging its temperature gauges into a 320×480 portrait layout. CPU and GPU temperatures, their load percentages, RAM usage and a clock fit the small screen. Theme and software license: GPL-2.0-or-later; full license included. This is a small source-based upstream project, not a commercial turnkey driver.
 
-## Install directly from GitHub
+## Install or update directly from GitHub
 
 On the **Ryzen 5700G / single RTX 3080 PC**, open Windows PowerShell or PowerShell 7 **as administrator** for hardware sensor access and paste this one line. No Git installation, clone or manual file download is needed:
 
@@ -22,6 +22,8 @@ To select a different rotation on first installation, use:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1))) -Rotation 90
 ```
 
+Normal reruns preserve the rotation in your existing managed startup task, as well as your theme. An explicitly different rotation is rejected rather than silently changing it.
+
 The older `-SetupOnly` argument remains accepted for compatibility; setup now always returns without starting a foreground display. Changing an already-registered startup rotation requires removing its task first, then installing with the desired rotation. Existing tasks are not silently overwritten.
 
 For manual diagnostics without downloading anything, use the commands below. **Do not run Panel, Info or TestPattern while another display process owns the USB device.** The final command starts a foreground panel only for manual testing:
@@ -38,7 +40,7 @@ If you already have a local copy of this folder, `.\Setup.ps1` also registers au
 1. Setup downloads a pinned upstream source archive, uses uv to create a dedicated Python 3.11 environment, and downloads the LibreHardwareMonitor .NET libraries through upstream's NuGet helper. It reuses an existing environment and libraries on rerun. It does **not** reinstall PawnIO. Dependencies are constrained by upstream, not fully locked; NuGet chooses its latest stable library on the first successful setup.
 2. **Info reads the actual resolution from the USB display.** A reported 480×320 needs rotation 90 or 270. The default **270** rotates the framebuffer clockwise to compensate for your portrait-left mounting (the original landscape right edge is at the top). If the result is upside down, quit with Ctrl+C and use `-Rotation 90`. A device reporting 320×480 uses 0 or 180. Other sizes deliberately fail rather than stretch the dashboard.
 3. TestPattern displays upstream color bars. Sensors lists the actual available hardware readings. Missing temperatures mean sensor access needs checking, not that the CPU is at zero degrees.
-4. The registered task starts the panel at one update per second after this user signs in, without an open terminal. Manual `Run.ps1` instead runs in the foreground; Ctrl+C stops that manual instance and turns off its backlight. On unplug/error the panel stops; reconnect and restart it. There is no tray icon or automatic USB reconnection.
+4. The registered task starts the panel at one update per second after this user signs in, without an open terminal. Manual `Run.ps1` instead runs in the foreground; Ctrl+C stops that manual instance and turns off its backlight. The updated panel listens for Windows sleep, resume and session-end events. It attempts to switch off the backlight before sleep/shutdown and reconnect after resume. There is no tray icon. Actual behavior must be checked on your display; forced shutdown and critical suspension can bypass notification.
 
 For a preview without USB writes:
 ```powershell
@@ -69,13 +71,9 @@ Source interface reviewed: upstream `device.py`, `framebuffer.py`, `render/engin
 
 Display setup now registers automatic startup by default. Run the setup in **PowerShell as administrator under your normal Windows account**. Setup does not start a second display process or terminate an existing one. After your next sign-in, the display starts without a terminal.
 
-For an already-installed, working display, add startup without rerunning setup:
+**For an existing installation, rerun the same `install.ps1` command above.** It updates the program and ensures startup is registered in one operation. There is no second installation command. The `autostart.ps1` helper remains for task status/removal and compatibility with old links; running it alone does not update the panel program.
 
-```powershell
-irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/autostart.ps1 | iex
-```
-
-This registers a Task Scheduler task for your account at sign-in, using the existing installation and portrait rotation 270. It runs without an open terminal, with elevated privileges for sensor access, and saves no password. It does **not** start another copy now or interrupt your current display. If your current foreground display is running in a separate terminal, keep that terminal open until sign-out if you want the display to remain on during this session. After your next sign-in, do not also launch `Run.ps1`. USB drivers and PawnIO are untouched.
+After an update, **sign out of Windows and sign back in** to load the new code. Setup intentionally leaves the running display alone and does not launch another copy. Save your work before signing out. The existing managed task and `autostart_runner.py` are reused unchanged; unrecognized task/helper customizations are refused and preserved. No password is stored, and USB drivers and PawnIO remain untouched.
 
 Status:
 
@@ -89,6 +87,19 @@ Remove automatic startup (administrator PowerShell):
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/autostart.ps1))) -Action Remove
 ```
 
-Removal only unregisters this task; it does not terminate a running display or delete installation files. If startup fails, inspect `%LOCALAPPDATA%\AX206Panel\autostart.log`. The log keeps one previous copy when it grows beyond 2 MB at startup. The USB display must be connected at sign-in; automatic USB reconnection is not implemented. The task runs while this user is signed in, not before login. Signing in as a different administrator registers that administrator's task instead, so use your normal account.
+Removal only unregisters this task; it does not terminate a running display or delete installation files. If startup fails, inspect `%LOCALAPPDATA%\AX206Panel\autostart.log`. The log keeps one previous copy when it grows beyond 2 MB at startup. The display should be connected at sign-in. Resume reconnection is handled by the panel; check the log if it cannot reopen the device. The task runs while this user is signed in, not before login. Signing in as a different administrator registers that administrator's task instead, so use your normal account.
 
 Task Scheduler details: [sign-in trigger](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasktrigger), [interactive elevated principal](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal), [no time limit and IgnoreNew](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset). The `pythonw.exe` process avoids a console window; stdout and errors are redirected before running the panel.
+
+## Verify the update on this PC
+
+After signing out and back in, check that exactly one dashboard is running without a terminal, then:
+
+1. Sleep the PC normally. Check whether the display backlight turns off.
+2. Wake the PC. Check that live CPU/GPU readings return, not just the old frozen image.
+3. Shut Windows down normally. Check the backlight even though this USB port supplies standby power.
+4. Start/sign in again, and separately test Restart. Check that the display returns once, with the saved portrait orientation.
+
+Do not change the working USB driver to troubleshoot these events. If any step fails, note the step and inspect `%LOCALAPPDATA%\AX206Panel\autostart.log`. A successful automated test of a simulated event is **not** a hardware power-transition test. Abrupt power loss, forced termination and critical sleep can prevent the application from sending its backlight-off command. Windows only allows a short time to handle normal suspend.
+
+Power-event design references: [WM_POWERBROADCAST](https://learn.microsoft.com/en-us/windows/win32/power/wm-powerbroadcast), [suspend timing](https://learn.microsoft.com/en-us/windows/win32/power/pbt-apmsuspend), and [session-end messages](https://learn.microsoft.com/en-us/windows/win32/shutdown/shutting-down). The actual scheduled process is `pythonw.exe`; a console-only signal handler is insufficient.

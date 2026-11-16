@@ -35,13 +35,18 @@ if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath (Join
     if (-not (Test-Path -LiteralPath (Join-Path $source 'lib\LibreHardwareMonitorLib.dll'))) { throw 'LibreHardwareMonitorLib.dll was not extracted. Setup incomplete.' }
     Set-Content -LiteralPath $marker -Value 'Completed fetch_lhm.py'
 }
-# Copy runner only. Never overwrite an existing user-customized theme.
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'panel.py') -Destination $InstallDir -Force
+# Update managed program files, not the user's theme. Running code is not stopped.
+foreach ($name in @('panel.py','power_events.py','usb_transport.py','Run.ps1','autostart.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $InstallDir -Force
+}
 if (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'portrait.yaml'))) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'portrait.yaml') -Destination $InstallDir
 }
 # Register for next sign-in only; never start or stop a running display here.
-& (Join-Path $PSScriptRoot 'autostart.ps1') -InstallDir $InstallDir -Rotation $Rotation
+$startupArgs = @{ InstallDir = $InstallDir }
+if ($PSBoundParameters.ContainsKey('Rotation')) { $startupArgs.Rotation = $Rotation }
+& (Join-Path $PSScriptRoot 'autostart.ps1') @startupArgs
 Write-Host "Installed at $InstallDir with sign-in startup. No USB driver, PawnIO or other application was changed."
 Write-Host 'The display will start without a terminal at your next Windows sign-in. Do not start a second copy if it is already running.'
 
+Write-Host 'Updated power handling takes effect after sign-out/sign-in. An already-running panel keeps its previous code until then.'

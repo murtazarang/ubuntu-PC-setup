@@ -36,6 +36,12 @@ try {
  & $source -InstallDir $root -Action Status | Out-Null
  $failed=$false; try { & $source -InstallDir $root -Rotation 90 } catch { $failed=$true }
  Assert $failed 'Different rotation was silently overwritten'
+ # Existing managed task with a nondefault rotation is preserved on ordinary rerun.
+ $oldArguments=$global:AxTask.Actions[0].Arguments
+ $global:AxTask.Actions[0].Arguments=$oldArguments -replace '270$', '90'
+ & $source -InstallDir $root
+ Assert ($global:AxRegistered -eq 1 -and $global:AxTask.Actions[0].Arguments.EndsWith('90')) 'Existing rotation not preserved'
+ $global:AxTask.Actions[0].Arguments=$oldArguments
  $global:AxTask.Description='Unrelated task'
  $failed=$false; try { & $source -InstallDir $root -Action Remove } catch { $failed=$true }
  Assert ($failed -and $global:AxRemoved -eq 0) 'Unrelated task removed'

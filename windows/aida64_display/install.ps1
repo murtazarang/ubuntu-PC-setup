@@ -25,25 +25,24 @@
         Invoke-WebRequest -Uri 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive -UseBasicParsing
         Expand-Archive -LiteralPath $archive -DestinationPath $runDir
         $scripts = Join-Path $runDir 'ubuntu-PC-setup-main\windows\aida64_display'
-        foreach ($name in @('Setup.ps1','Run.ps1','panel.py','portrait.yaml','LICENSE','autostart.ps1')) {
+        foreach ($name in @('Setup.ps1','Run.ps1','panel.py','portrait.yaml','LICENSE','autostart.ps1','power_events.py','usb_transport.py')) {
             if (-not (Test-Path -LiteralPath (Join-Path $scripts $name) -PathType Leaf)) {
                 throw "Downloaded archive is missing AX206 file: $name"
             }
         }
         # Child-process policy only; no persistent policy or registry change.
-        & $hostExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'Setup.ps1') -InstallDir $InstallDir -Rotation $Rotation
+        $setupArgs = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $scripts 'Setup.ps1'),'-InstallDir',$InstallDir)
+        if ($PSBoundParameters.ContainsKey('Rotation')) { $setupArgs += @('-Rotation', [string]$Rotation) }
+        & $hostExe @setupArgs
         if ($LASTEXITCODE -ne 0) { throw "AX206 Setup.ps1 failed with exit code $LASTEXITCODE. See its output above." }
-        # Only our launcher is updated. Setup preserves an existing portrait.yaml.
-        Copy-Item -LiteralPath (Join-Path $scripts 'Run.ps1') -Destination (Join-Path $InstallDir 'Run.ps1') -Force
         Remove-Item -LiteralPath $archive
         $quotedHost = $hostExe.Replace("'", "''")
         $quotedDir = $InstallDir.Replace("'", "''")
-        Write-Host 'Setup complete. For manual foreground diagnostics only (do not run a second copy):'
-        Write-Host "& '$quotedHost' -NoProfile -ExecutionPolicy Bypass -File '$quotedDir\Run.ps1' -InstallDir '$quotedDir' -Rotation $Rotation"
+        Write-Host 'Setup complete. Existing startup rotation and theme were preserved unless this was a new installation.'
         Write-Host 'To inspect USB resolution or diagnose access:'
         Write-Host "& '$quotedHost' -NoProfile -ExecutionPolicy Bypass -File '$quotedDir\Run.ps1' -InstallDir '$quotedDir' -Action Info"
         Write-Host 'Automatic startup is enabled. The display starts without a terminal after your next Windows sign-in.'
-        Write-Host 'Any currently running display was left alone. You can close this setup terminal.'
+        Write-Host 'Any currently running display was left alone. Sign out and back in to load this update; you can close this setup terminal.'
     } catch {
         Write-Host "Downloaded setup files remain at: $runDir"
         throw

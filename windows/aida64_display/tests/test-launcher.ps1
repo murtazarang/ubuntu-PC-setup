@@ -21,12 +21,14 @@ function Expand-Archive {
     param($LiteralPath, $DestinationPath)
     $files = Join-Path $DestinationPath 'ubuntu-PC-setup-main\windows\aida64_display'
     New-Item -ItemType Directory -Path $files -Force | Out-Null
-    foreach ($name in @('panel.py','portrait.yaml','LICENSE','autostart.ps1')) { Set-Content -LiteralPath (Join-Path $files $name) -Value 'mock asset' }
+    foreach ($name in @('panel.py','portrait.yaml','LICENSE','autostart.ps1','power_events.py','usb_transport.py')) { Set-Content -LiteralPath (Join-Path $files $name) -Value 'mock asset' }
     if ($script:Missing) { return }
     $setup = @'
 param($InstallDir,$Rotation)
 if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'panel.py'))) { throw 'PSScriptRoot was lost' }
 Set-Content -LiteralPath (Join-Path $InstallDir 'setup-called') -Value $PSScriptRoot
+Set-Content -LiteralPath (Join-Path $InstallDir 'rotation-passed') -Value $PSBoundParameters.ContainsKey('Rotation')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Run.ps1') -Destination $InstallDir
 '@
     # Put the failure directly into the generated script, independent of scope.
     if ($script:FailSetup) { $setup = "param(`$InstallDir,`$Rotation)`nthrow 'Mock setup failure'" }
@@ -50,9 +52,11 @@ try {
     & ([scriptblock]::Create($code)) -InstallDir $install -SetupOnly
     Assert ($Rotation -eq 'invalid caller value' -and $InstallDir -eq 'do not modify caller') 'Caller variables changed'
     Assert (Test-Path -LiteralPath (Join-Path $install 'Run.ps1')) 'Durable runner missing'
+    Assert ((Get-Content -LiteralPath (Join-Path $install 'rotation-passed') -Raw).Trim() -eq 'False') 'Default rotation was explicitly passed, losing existing settings'
     Assert (-not (Test-Path -LiteralPath (Join-Path $install 'run-called'))) 'SetupOnly started hardware runner'
     Assert ((Get-Content -LiteralPath (Join-Path $install 'portrait.yaml') -Raw).Trim() -eq 'MY CUSTOM THEME') 'Existing theme overwritten'
     & ([scriptblock]::Create($code)) -InstallDir $install -Rotation 90
+    Assert ((Get-Content -LiteralPath (Join-Path $install 'rotation-passed') -Raw).Trim() -eq 'True') 'Explicit rotation not passed'
     Assert (-not (Test-Path -LiteralPath (Join-Path $install 'run-called'))) 'Default installation started a second foreground display'
     # Real iex call with colliding caller variables uses its default location.
     $oldLocal = $env:LOCALAPPDATA

@@ -3,6 +3,7 @@ import argparse
 import logging
 from pathlib import Path
 import time
+from power_events import DisplayState, WindowsPowerListener, SingleInstance
 from PIL import Image
 
 
@@ -59,38 +60,103 @@ def main():
                        'gpu.load':81, 'ram.percent':54}).save(args.preview)
         print(f'Synthetic preview (not measured temperatures): {args.preview}')
         return
-    from ax206panel.device import AX206Device, get_backend
+    from ax206panel.device import get_backend
+    from usb_transport import BoundedAX206Device
     from ax206panel.framebuffer import image_to_rgb565
     from ax206panel.sensors import open_sources, merge_polls
     logging.basicConfig(level=logging.INFO)
     backend, backend_name = get_backend('auto')
+    state = DisplayState()
     sources = []
-    with AX206Device.open(index=args.index, backend=backend) as device:
-        size = (device.width, device.height)
-        print(f'AX206 {size[0]}x{size[1]}, {backend_name}. Ctrl+C to stop.')
-        orient(engine.render({}), size, args.rotation)  # Validate BEFORE any display writes.
+    device = None
+    warned = False
+    with SingleInstance(), WindowsPowerListener(state):
         try:
             sources = open_sources()
             hide_gpu = ambiguous_gpu(sources)
             if hide_gpu:
-                logging.warning('Multiple GPUs of the same vendor: hiding ambiguous upstream GPU values. CPU/RAM still work.')
-            device.set_backlight(7)
-            warned = False
-            while True:
+                logging.warning('Multiple GPUs of the same vendor: hiding ambiguous GPU readings.')
+            while not state.stopped.is_set():
+                if state.paused.is_set():
+                    state.changed.wait(1)
+                    state.changed.clear()
+                    continue
+                # Sensors and image rendering run outside the USB lock so a slow
+                # sensor never prevents the listener sending the off command.
                 values = merge_polls(sources)
                 if hide_gpu:
                     values = {k:v for k,v in values.items() if not k.startswith('gpu.')}
                 if not warned and ('cpu.temp' not in values or 'gpu.temp' not in values):
-                    logging.warning('Temperature unavailable: try an elevated terminal and --list-sensors. Missing values are shown as --, never invented.')
+                    logging.warning('Temperature unavailable. Missing values are shown as --.')
                     warned = True
-                image = orient(engine.render(values), size, args.rotation)
-                device.blit(image_to_rgb565(image))
-                time.sleep(1)
+                rendered = engine.render(values)
+                # Opening/closing may involve driver calls not bounded by PyUSB
+                # transfer timeouts. Do them OUTSIDE the power-notification lock.
+                if state.reopen.is_set() or device is None:
+                    state.reopen.clear()
+                    with state.lock:
+                        state.device = None
+                    if device is not None:
+                        device.close()
+                        device = None
+                    try:
+                        device = BoundedAX206Device.open(index=args.index, backend=backend)
+                        orient(rendered, (device.width, device.height), args.rotation)
+                        logging.info('AX206 connected: %dx%d (%s)', device.width, device.height, backend_name)
+                    except ValueError:
+                        if device is not None:
+                            device.close()
+                            device = None
+                        raise  # invalid theme/resolution is not a transient USB error
+                    except Exception:
+                        if device is not None:
+                            device.close()
+                            device = None
+                        logging.exception('Display unavailable; retrying in five seconds.')
+                        state.changed.wait(5)
+                        state.changed.clear()
+                        continue
+                    with state.lock:
+                        state.device = device
+                        # Suspend may have arrived while open() was running.
+                        if state.paused.is_set() or state.stopped.is_set():
+                            try:
+                                device.power_off()
+                            except Exception:
+                                logging.exception('Could not darken newly opened display.')
+                            continue
+                pixels = image_to_rgb565(orient(rendered, (device.width, device.height), args.rotation))
+                try:
+                    # Each lock hold contains one bounded USB command only.
+                    with state.lock:
+                        if state.paused.is_set() or state.stopped.is_set():
+                            continue
+                        device.blit(pixels)
+                    with state.lock:
+                        if state.paused.is_set() or state.stopped.is_set():
+                            continue
+                        device.set_backlight(7)
+                except Exception:
+                    logging.exception('Display transfer failed; reopening on next attempt.')
+                    state.reopen.set()
+                    state.changed.wait(5)
+                    state.changed.clear()
+                    continue
+                state.changed.wait(1)
+                state.changed.clear()
         except KeyboardInterrupt:
             print('Stopped.')
         finally:
-            # Try to prevent stale temperatures looking live, even after an error.
-            cleanup(sources, device)
+            state.darken(shutdown=True)
+            with state.lock:
+                state.device = None
+            if device is not None:
+                device.close()
+            for source in sources:
+                try:
+                    source.close()
+                except Exception:
+                    logging.exception('Could not close sensor source.')
 
 if __name__ == '__main__':
     main()
