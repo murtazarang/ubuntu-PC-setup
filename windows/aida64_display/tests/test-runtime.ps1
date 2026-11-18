@@ -7,7 +7,6 @@ function Stop-Service {throw 'Runtime test must not stop services'}
 function Start-Service {throw 'Runtime test must not start services'}
 function Register-ScheduledTask {throw 'Runtime test must not register tasks'}
 function Invoke-StartupMigration {throw 'Runtime test must not migrate startup'}
-$uvPath=(Get-Command uv.exe -ErrorAction Stop).Source
 $assets=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $work=Join-Path ([IO.Path]::GetTempPath()) ('AX206 real staging '+[guid]::NewGuid())
 $beforePython=$env:UV_PYTHON_INSTALL_DIR
@@ -19,6 +18,19 @@ function Assert-EnvironmentRestored {
 }
 New-Item -ItemType Directory $work | Out-Null
 try {
+    $savedPath=$env:Path
+    try {
+        $env:Path="$env:SystemRoot\System32;$env:SystemRoot"
+        Assert (-not (Get-Command uv.exe -ErrorAction SilentlyContinue)) 'Test requires uv absent from PATH'
+        $tools=Join-Path $work 'private tools'
+        $uvPath=Get-ServiceUv $tools
+        $hash=(Get-FileHash $uvPath).Hash
+        $stamp=(Get-Item $uvPath).LastWriteTimeUtc
+        $again=Get-ServiceUv $tools
+        Assert ($again -eq $uvPath -and (Get-FileHash $again).Hash -eq $hash -and (Get-Item $again).LastWriteTimeUtc -eq $stamp) 'uv rerun replaced existing executable'
+        Assert ($env:Path -eq "$env:SystemRoot\System32;$env:SystemRoot") 'Bootstrap changed PATH'
+        Write-Host 'Actual absent-PATH uv bootstrap and reuse passed'
+    } finally { $env:Path=$savedPath }
     $commit='11280756789f1d61b80b49383b255acde62a9c60'
     $zip=Join-Path $work 'source.zip'
     Invoke-WebRequest "https://github.com/mechcow/win-ax206-display/archive/$commit.zip" -OutFile $zip -UseBasicParsing

@@ -10,6 +10,10 @@ Open **PowerShell as administrator**, under your usual Windows account:
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1 | iex
 ```
 
+The standalone installer supplies its own private uv 0.13.9 from the [official release](https://github.com/astral-sh/uv/releases/tag/0.13.9), verifies the published SHA-256, and reuses it on subsequent runs. It needs neither the main PC setup, WinGet, Git, Python nor PowerShell 7. This copy lives under protected `Program Files\AX206Panel\tools`; existing uv installations and PATH are unchanged. Requires x64 Windows and 64-bit administrator PowerShell. See [official uv installation methods](https://docs.astral.sh/uv/getting-started/installation/#github-releases).
+
+USB access and sensor drivers are separate prerequisites: this script never installs or changes USB drivers or PawnIO. On a genuinely fresh PC these still require your explicit manual setup; installing the service alone does not establish hardware readiness.
+
 ## Patch an existing installation
 
 Close any manually started foreground panel with Ctrl+C first. Do not uninstall the working USB driver or PawnIO. Run in administrator PowerShell:

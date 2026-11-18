@@ -97,6 +97,35 @@ function Read-ServiceConfig {
     Assert-ProtectedDirectory $full
     return $value
 }
+# Portable official release: no WinGet, global PATH, registry or shell changes.
+function Get-ServiceUv {
+    param([string]$ToolsDirectory)
+    if (-not [Environment]::Is64BitProcess -or ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64')) { throw 'AX206 standalone setup requires 64-bit PowerShell on x64 Windows.' }
+    New-ProtectedDirectory $ToolsDirectory
+    $exe = Join-Path $ToolsDirectory 'uv.exe'
+    if (Test-Path -LiteralPath $exe -PathType Leaf) { Assert-ProtectedDirectory $exe }
+    else {
+        $zip = Join-Path $ToolsDirectory 'uv.zip'
+        $url = 'https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip'
+        Write-Host 'Downloading the private AX206 uv prerequisite (no global installation required).'
+        Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
+        $expected = ((Invoke-WebRequest ($url + '.sha256') -UseBasicParsing).Content.Trim() -split '\s+')[0]
+        if ($expected -notmatch '^[a-fA-F0-9]{64}$' -or (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $expected) { throw 'Official uv archive checksum verification failed; no startup was changed.' }
+        Expand-Archive -LiteralPath $zip -DestinationPath $ToolsDirectory -Force
+        Remove-Item -LiteralPath $zip
+    }
+    Assert-NotReparsePoint $exe
+    # Files created by an elevated user must not remain user-owned.
+    foreach ($file in Get-ChildItem -LiteralPath $ToolsDirectory -Recurse -Force) {
+        Assert-NotReparsePoint $file.FullName
+        $acl=Get-Acl -LiteralPath $file.FullName
+        $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+        Set-Acl -LiteralPath $file.FullName -AclObject $acl
+    }
+    Invoke-CheckedNative $exe @('--version') | Out-Host
+    return $exe
+}
+
 function Initialize-ServiceRuntime {
     param([string]$Release,[string]$Source,[string]$UvExe)
 $oldPythonDir = $env:UV_PYTHON_INSTALL_DIR
@@ -199,7 +228,6 @@ if ($Action -eq 'Remove') {
     Write-Host 'AX206 service removed. Runtime, settings, logs and drivers were preserved.'
     return
 }
-$uv = Get-Command uv.exe -ErrorAction Stop
 $LegacyInstallDir = [IO.Path]::GetFullPath($LegacyInstallDir).TrimEnd('\')
 $otherTasks = @(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -like 'AX206Panel-*' -and $_.TaskName -ne "AX206Panel-$($identity.User.Value)" })
 if ($otherTasks.Count) { throw "Other-account AX206 startup tasks exist: $($otherTasks.TaskName -join ', '). No task was changed. Resolve these before enabling a machine-wide service." }
@@ -240,7 +268,8 @@ Expand-Archive -LiteralPath $archive -DestinationPath $release
 Move-Item -LiteralPath (Join-Path $release "win-ax206-display-$commit") -Destination (Join-Path $release 'source')
 Remove-Item -LiteralPath $archive
 $source = Join-Path $release 'source'
-Initialize-ServiceRuntime -Release $release -Source $source -UvExe $uv.Source
+$uv = Get-ServiceUv -ToolsDirectory (Join-Path $root 'tools')
+Initialize-ServiceRuntime -Release $release -Source $source -UvExe $uv
 $python = Join-Path $release '.venv\Scripts\python.exe'
 foreach ($name in @('service_host.py','safe_theme.py','panel.py','lifecycle.py','usb_transport.py','Run.ps1','Service.ps1','LICENSE')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $release

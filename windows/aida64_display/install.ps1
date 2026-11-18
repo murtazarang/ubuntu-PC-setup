@@ -10,7 +10,6 @@ $ErrorActionPreference = 'Stop'
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Open PowerShell as administrator under your normal account.' }
-if (-not (Get-Command uv.exe -ErrorAction SilentlyContinue)) { throw 'uv is required. Install it using the PC setup prerequisites first.' }
 $hostName = if ($PSVersionTable.PSEdition -eq 'Core') {'pwsh.exe'} else {'powershell.exe'}
 $hostExe = Join-Path $PSHOME $hostName
 $runDir = Join-Path $env:TEMP ('ax206-service-' + [guid]::NewGuid())
