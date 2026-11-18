@@ -82,7 +82,9 @@ for proc in pathlib.Path('/proc').glob('[0-9]*'):
   if proc.stat().st_uid!=os.getuid() or int(proc.name)==os.getpid():continue
   args=(proc/'cmdline').read_bytes().decode(errors='replace').split('\0')
   executable=os.readlink(proc/'exe').removesuffix(' (deleted)')
- except (OSError,ValueError):continue
+ except (FileNotFoundError,ProcessLookupError):continue
+ except OSError as exc:
+  raise SystemExit('Cannot inspect process '+proc.name+' safely; no deletion performed: '+str(exc))
  if executable in package_files or any(executable==root or executable.startswith(root+'/') for root in roots) or any(arg==root or arg.startswith(root+'/') for arg in args for root in roots):
   raise SystemExit('A legacy runtime is still running (PID '+proc.name+'). Close it and rerun; nothing was forcibly killed.')
 PY

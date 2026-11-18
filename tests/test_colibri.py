@@ -194,11 +194,16 @@ class DirectCleanupTests(unittest.TestCase):
    self.assertNotEqual(r.returncode,0);self.assertIn('Symlinked user service',r.stderr);self.assertTrue(unit.exists())
 
  def test_running_runtime_executable_detected_despite_custom_argv0(self):
-  import shutil
+  import shutil,time
+  if not shutil.which('cc'): self.skipTest('C compiler required for live native process fixture')
   with tempfile.TemporaryDirectory() as td:
-   p=pathlib.Path(td);runtime=p/'data/strata/components';runtime.mkdir(parents=True);binary=runtime/'running';shutil.copy('/bin/sleep',binary)
+   p=pathlib.Path(td);runtime=p/'data/strata/components';runtime.mkdir(parents=True);binary=runtime/'running'
+   source=p/'wait.c';source.write_text('#include <unistd.h>\nint main(void){sleep(30);return 0;}\n')
+   subprocess.run(['cc',str(source),'-o',str(binary)],check=True)
    proc=subprocess.Popen(['innocent-name','30'],executable=str(binary))
    try:
+    time.sleep(.1);self.assertIsNone(proc.poll(),'Native fixture must be alive before cleanup')
+    self.assertEqual(os.readlink('/proc/'+str(proc.pid)+'/exe'),str(binary))
     r=self.run_cleanup(p);self.assertNotEqual(r.returncode,0);self.assertIn('still running',r.stderr);self.assertTrue(binary.exists())
    finally:proc.terminate();proc.wait()
  def test_multiple_execstart_unit_refused(self):
