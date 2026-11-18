@@ -133,4 +133,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Linux setup tests without installation
-        run: python3 -m unittest discover -s tests -v
+        run: |
+          command -v gio
+          python3 -m unittest discover -s tests -v
