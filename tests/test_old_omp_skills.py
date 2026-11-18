@@ -59,6 +59,19 @@ class Cleanup(unittest.TestCase):
   with self.assertRaisesRegex(RuntimeError,'process started'):
    m.remove(self.home,[],confirm,process_guard=guard)
   self.assertTrue((self.old/'custom.md').exists())
+ def test_unregistered_corpus_and_partial_block_before_confirmation(self):
+  for suffix in ('.zim','.zim.part'):
+   with self.subTest(suffix=suffix):
+    nested=self.old/'downloads';nested.mkdir(exist_ok=True)
+    archive=nested/('wikipedia_en_all_nopic_2026-06'+suffix);archive.write_text('irreplaceable')
+    with self.assertRaisesRegex(RuntimeError,'archive download retained'):
+     m.remove(self.home,[],lambda _: self.fail('Must not ask to delete an undiscovered archive'))
+    self.assertEqual(archive.read_text(),'irreplaceable');archive.unlink()
+ def test_archive_appearing_during_confirmation_blocks_deletion(self):
+  archive=self.old/'wiki.zim.part'
+  def confirm(_):archive.write_text('partial');return 'DELETE OLD OMP SKILLS'
+  with self.assertRaisesRegex(RuntimeError,'archive download retained'):m.remove(self.home,[],confirm)
+  self.assertTrue(archive.exists());self.assertTrue((self.old/'custom.md').exists())
  def test_decline(self):
   with self.assertRaises(RuntimeError):m.remove(self.home,[],lambda _: 'no')
   self.assertTrue(self.old.exists())

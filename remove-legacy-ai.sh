@@ -48,6 +48,7 @@ for name in sys.argv[1:]:
  if p.exists():
   for child in (p,*p.rglob('*')):
    if child.is_mount():raise SystemExit('Refusing mounted deletion subtree: '+str(child))
+   if child.name.lower().endswith(('.zim','.zim.part')):raise SystemExit('Wikipedia/archive download retained; cleanup stopped: '+str(child))
 PY
 }
 check_paths

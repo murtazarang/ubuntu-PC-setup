@@ -22,7 +22,9 @@ if(-not $ArchiveDirectory){throw 'Existing reference manifest has no archive dir
 # BEGIN migration stages
 # Reject even confirmed legacy deletion when it overlaps active replacement data.
 . (Join-Path $PSScriptRoot 'Remove-LegacyAI.ps1')
-$legacyPaths=@(Get-LegacyCandidates|ForEach-Object {$_.Path})
+$legacyCandidates=@(Get-LegacyCandidates)
+$legacyPaths=@($legacyCandidates|ForEach-Object {$_.Path})
+Assert-LegacyCorpusAbsent $legacyCandidates
 $activeReference=if(Test-Path -LiteralPath $reference){Get-Content -LiteralPath $reference -Raw|ConvertFrom-Json}else{[pscustomobject]@{archive_directory=$ArchiveDirectory;archive=(Join-Path $ArchiveDirectory 'wikipedia_en_all_nopic_2026-06.zim')}}
 $colibriSettings=Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json'
 $activeColibri=if(Test-Path -LiteralPath $colibriSettings){Get-Content -LiteralPath $colibriSettings -Raw|ConvertFrom-Json}else{[pscustomobject]@{models=(Join-Path $env:USERPROFILE 'colibri-models')}}

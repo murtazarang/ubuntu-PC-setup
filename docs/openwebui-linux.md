@@ -13,7 +13,7 @@ Desktop files may require GNOME's **Allow Launching** once. Services belong to y
 
 ## First-use integrations
 
-After creating your account on a fresh installation, run the import-only `finish-openwebui.sh` command below. It verifies the complete skill collections and Wikipedia connections without legacy discovery or cleanup. Existing PCs use the separate migration entry point. Skill instructions alone do not provide a Python execution sandbox; locally installed science tools are retained, but their invocation from WebUI requires a supported tool integration. This setup does not silently grant remote shell execution.
+After creating your account on a fresh installation, run the import-only `finish-openwebui.sh` command below. It verifies the complete skill collections and Wikipedia connections without legacy discovery or cleanup. Existing PCs use the separate migration entry point. Skill instructions alone do not provide a Python execution sandbox; shared science tools are not removed; the old setup-specific `omp-scientific-tools` environment is removed by existing-PC migration. Running science tools from WebUI requires a supported tool integration. This setup does not silently grant remote shell execution.
 
 The shared import helper configures the local connections after signing in. For inspection in Open WebUI's administrator settings:
 
@@ -83,3 +83,5 @@ Intel embeddings/reranking references: https://www.sbert.net/docs/sentence_trans
 ### Approved retrieval defaults
 
 Fresh configurations use `BAAI/bge-small-en-v1.5` embeddings and `cross-encoder/ms-marco-MiniLM-L6-v2` reranking, with token-based chunks of 400 and overlap of 50. Existing retrieval configurations and indexed knowledge are preserved; changing embedding models requires deliberate reindexing, not silent reuse of old vectors. Fresh environment defaults initialize these settings; the shared first-use helper verifies active persisted settings and stops on conflicting existing choices without changing them. B580 installation probes these exact model IDs on OpenVINO GPU; NVIDIA remains CUDA.
+
+Migration also refuses cleanup if an unregistered `.zim` archive or `.zim.part` download is found inside an old deletion root. It prints the path and leaves it untouched; relocate the corpus deliberately and configure its retained location before retrying. It does not silently move or delete an archive.

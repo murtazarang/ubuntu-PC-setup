@@ -54,6 +54,7 @@ foreach($value in @($inventory.custom_roots)){
     if(-not $covered){throw "Additional configured OMP skill root requires exclusive-ownership review before deletion: $full. It may be shared with another tool; no unrelated directory was deleted."}
 }
 function Assert-SafeOldCollection([string]$Path){
+    & (Join-Path $PSScriptRoot 'Assert-NoCorpus.ps1') -CandidatePaths @($Path)
     $item=Get-Item -LiteralPath $Path -Force
     if(-not $item.PSIsContainer){throw "Old collection path is not a directory: $Path"}
     $ancestor=$item
@@ -86,7 +87,7 @@ foreach($path in $targets){
     $created=$initial.CreationTimeUtc
     if((Read-Host 'Type the full directory path shown above to confirm irreversible removal; Enter cancels') -cne $path){throw "Old skill deletion declined. Collection retained: $path. Migration cleanup is incomplete."}
     Assert-OldDataNotRunning
-    Assert-SafeOldCollection $path
+    foreach($remaining in $targets){if(Test-Path -LiteralPath $remaining){Assert-SafeOldCollection $remaining}}
     if((Get-Item -LiteralPath $path -Force).CreationTimeUtc -ne $created){throw 'Old collection directory changed during confirmation; preserved.'}
     Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
     if(Test-Path -LiteralPath $path){throw "Old collection deletion did not verify: $path"}

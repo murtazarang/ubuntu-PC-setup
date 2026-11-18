@@ -29,6 +29,17 @@ try {
     $Apply=$true
     Invoke-LegacyCleanup
     if (-not (Test-Path $runtime) -or $script:configTouched) { throw 'Dry-run or declined confirmation changed data/config.' }
+    foreach($name in @('WIKIPEDIA.ZIM','wikipedia.ZIM.PART')){
+        $nested=Join-Path $runtime 'nested';New-Item -ItemType Directory $nested -Force|Out-Null
+        $archive=Join-Path $nested $name;Set-Content $archive 'unregistered corpus'
+        $blocked=$false;try{Invoke-LegacyCleanup}catch{$blocked=$true;if($_.Exception.Message -notlike "*$name*"){throw}}
+        if(-not $blocked -or -not(Test-Path $archive) -or $script:configTouched){throw 'Unregistered corpus must block all legacy modifications'}
+        Remove-Item $archive
+    }
+    function Read-Host {param($Prompt) Set-Content (Join-Path $env:LOCALAPPDATA 'Strata\late.zim.part') 'arrived during prompt';'DELETE'}
+    $blocked=$false;try{Invoke-LegacyCleanup}catch{$blocked=$true;if($_.Exception.Message -notmatch 'late.zim.part'){throw}}
+    if(-not $blocked -or -not(Test-Path $runtime) -or $script:configTouched){throw 'Late corpus must block after confirmation'}
+    Remove-Item (Join-Path $runtime 'late.zim.part')
     function Read-Host { param($Prompt) 'DELETE' }
     Invoke-LegacyCleanup
     if (Test-Path $runtime) { throw 'Runtime not deleted.' }

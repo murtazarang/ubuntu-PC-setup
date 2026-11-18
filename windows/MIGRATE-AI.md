@@ -32,3 +32,5 @@ The migration does not start or switch text/image model servers; after installat
 Safe fixtures execute the bounded migration stages with inert helper files and confirm destructive-first order, cancellation blocking later stages, active model/corpus protection, and later setup failure propagation. Separate disposable-directory tests cover deletion of modified old collections/app data with exact-path confirmation while preserving Wikipedia and unrelated siblings. Full native uninstallers, GPU inference and complete device migration still require the Windows PC.
 
 Source path definitions: OMP `packages/utils/src/dirs.ts`; Paseo `server/src/server/paseo-home.ts` and `desktop/src/main.ts`; Strata `discovery.py`/`paths.py`; XeStrata `serve/places.py`. The original setup's `Install-Skills.ps1` defines the three old collection destinations.
+
+Migration also refuses cleanup if an unregistered `.zim` archive or `.zim.part` download is found inside an old deletion root. It prints the path and leaves it untouched; relocate the corpus deliberately and configure its retained location before retrying. It does not silently move or delete an archive.

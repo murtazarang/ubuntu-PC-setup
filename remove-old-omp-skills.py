@@ -33,6 +33,15 @@ def inventory(home, protected, roots=None):
         for mount in mountpoints():
             if mount == path or path in mount.parents:
                 raise RuntimeError(f'Refusing mounted deletion subtree: {mount}')
+        # An archive may predate reference.json or live at a custom location.
+        # Do not follow directory links or cross mounts; mounts were rejected above.
+        if path.is_dir():
+            def fail_walk(error):
+                raise RuntimeError('Cannot inspect old data for Wikipedia archives: '+str(error))
+            for directory, dirs, files in os.walk(path, followlinks=False, onerror=fail_walk):
+                for name in (*dirs, *files):
+                    if name.lower().endswith(('.zim', '.zim.part')):
+                        raise RuntimeError('Wikipedia/archive download retained; cleanup stopped before deletion: '+str(Path(directory)/name)+'. Relocate it deliberately before retrying.')
         for keep in protected:
             resolved = keep.resolve()
             if resolved == path.resolve() or path.resolve() in resolved.parents or resolved in path.resolve().parents:

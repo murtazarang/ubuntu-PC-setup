@@ -17,6 +17,7 @@ try {
     Set-Content (Join-Path $temp 'Colibri-PC-Setup\settings.json') '{"models":"C:\\fixture-models"}'
     Set-Content (Join-Path $temp 'reference.json') '{"archive":"C:\\fixture-archives\\wiki.zim","archive_directory":"C:\\fixture-archives"}'
     Copy-Item (Join-Path $PSScriptRoot 'Assert-MigrationPaths.ps1') $temp
+    Copy-Item (Join-Path $PSScriptRoot 'Assert-NoCorpus.ps1') $temp
     & python -m venv (Join-Path $root 'venv')
     if($LASTEXITCODE -ne 0){throw 'Fixture Python creation failed'}
     Set-Content (Join-Path $root 'desktop.json') '{"text_model":"C:\\fixture-models\\text","image_model":"C:\\fixture-models\\image"}'
@@ -25,13 +26,13 @@ try {
     foreach($name in @('Install-Reference.ps1','Install-Colibri.ps1','Install-OpenWebUI.ps1')){
         Set-Content (Join-Path $temp $name) "Add-Content -LiteralPath `$env:TEST_AI_LOG -Value '$name'"
     }
-    Set-Content (Join-Path $temp 'Remove-LegacyAI.ps1') 'param([switch]$Apply,[switch]$RequireRemoval,[switch]$SkipOmpConfig); if($MyInvocation.InvocationName -eq "."){function Get-LegacyCandidates {if($env:TEST_LEGACY_ROOT){return [pscustomobject]@{Path=$env:TEST_LEGACY_ROOT}};return @()};return}; if(-not($Apply -and $RequireRemoval -and $SkipOmpConfig)){throw "Missing migration guards"}; Add-Content $env:TEST_AI_LOG legacy; if($env:TEST_FAIL_LEGACY -eq "1"){throw "Declined fixture"}'
+    Set-Content (Join-Path $temp 'Remove-LegacyAI.ps1') 'param([switch]$Apply,[switch]$RequireRemoval,[switch]$SkipOmpConfig); if($MyInvocation.InvocationName -eq "."){function Assert-LegacyCorpusAbsent($Candidates) {& (Join-Path $PSScriptRoot "Assert-NoCorpus.ps1") -CandidatePaths @($Candidates|ForEach-Object {$_.Path})}; function Get-LegacyCandidates {if($env:TEST_LEGACY_ROOT){return [pscustomobject]@{Path=$env:TEST_LEGACY_ROOT}};return @()};return}; if(-not($Apply -and $RequireRemoval -and $SkipOmpConfig)){throw "Missing migration guards"}; Add-Content $env:TEST_AI_LOG legacy; if($env:TEST_FAIL_LEGACY -eq "1"){throw "Declined fixture"}'
     Set-Content (Join-Path $temp 'Remove-VerifiedOMP.ps1') 'param([switch]$CleanupAuthorizedThisRun,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing authorization gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG omp-inventory}else{Add-Content $env:TEST_AI_LOG omp}'
     Set-Content (Join-Path $temp 'Remove-OMPBinary.ps1') '# inert fixture'
     Set-Content (Join-Path $temp 'Remove-OldSkillCollections.ps1') 'param([switch]$CleanupAuthorizedThisRun,[string[]]$ProtectedPaths,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG old-inventory}else{Add-Content $env:TEST_AI_LOG old-skills}'
     $driver=Join-Path $temp 'driver.ps1'
     Set-Content $driver ('$ErrorActionPreference="Stop";$root=$env:TEST_AI_ROOT;$Hardware="NvidiaSingle";$ArchiveDirectory="C:\fixture";$reference=Join-Path $env:LOCALAPPDATA "reference.json"'+[Environment]::NewLine+$block)
-    foreach($case in @('import-fails','legacy-declines','success','linked-weights')){
+    foreach($case in @('import-fails','legacy-declines','success','linked-weights','unregistered-zim','unregistered-part')){
         $env:TEST_AI_LOG=Join-Path $temp ($case+'.log')
         # A correct protection preflight can reject the run before any stage emits an event.
         [IO.File]::WriteAllText($env:TEST_AI_LOG,'')
@@ -43,6 +44,14 @@ try {
             New-Item -ItemType Directory -Path $activeModel -Force|Out-Null
             @{format='colibri-gguf-v1';gguf='C:\fixture-legacy\weights\model.gguf'}|ConvertTo-Json|Set-Content (Join-Path $activeModel 'gguf.json')
             @{text_model=$activeModel;image_model='C:\fixture-models\image'}|ConvertTo-Json|Set-Content (Join-Path $root 'desktop.json')
+        }
+
+        if($case -in @('unregistered-zim','unregistered-part')){
+            Remove-Item (Join-Path $temp 'reference.json') -ErrorAction SilentlyContinue
+            $env:TEST_LEGACY_ROOT=Join-Path $temp $case
+            $nested=Join-Path $env:TEST_LEGACY_ROOT 'nested';New-Item -ItemType Directory $nested -Force|Out-Null
+            $name=if($case -eq 'unregistered-zim'){'WIKIPEDIA.ZIM'}else{'wikipedia.ZIM.PART'}
+            Set-Content (Join-Path $nested $name) 'preserve even without manifest'
         }
 
         $env:TEST_FAIL_IMPORT=if($case -eq 'import-fails'){'1'}else{'0'}
@@ -63,7 +72,7 @@ try {
             if($case -eq 'import-fails' -and $code -eq 0){throw 'Replacement import failure was falsely reported as complete'}
         }else{
             if($code -eq 0 -or 'omp' -in $events -or 'old-skills' -in $events -or 'Install-Reference.ps1' -in $events){throw "$case must block later cleanup and installation"}
-            if($case -eq 'linked-weights' -and 'legacy' -in $events){throw 'Active linked weights must block ALL deletion'}
+            if($case -in @('linked-weights','unregistered-zim','unregistered-part') -and 'legacy' -in $events){throw 'Active linked weights must block ALL deletion'}
         }
     }
     & (Join-Path $PSScriptRoot 'Assert-MigrationPaths.ps1') -CandidatePaths @('C:\legacy') -ProtectedPaths @('C:\wiki')

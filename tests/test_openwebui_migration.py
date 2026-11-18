@@ -10,6 +10,9 @@ class Migration(unittest.TestCase):
   archive=data/'strata/models/wiki.zim' if protected is True else home/'wiki.zim'
   (base/'reference.json').write_text(json.dumps({'archive':str(archive),'sha256':'0'*64}))
   model=data/'pc-setup-colibri';model.mkdir();(model/'managed-models.json').write_text(json.dumps({'owner':'ubuntu-PC-setup','roots':{'text':str(home/'colibri-models/text')}}))
+  if protected=='unregistered_corpus':
+   archive=data/'strata/models/downloads/wiki.zim.part';archive.parent.mkdir(parents=True);archive.write_text('keep')
+   (base/'reference.json').unlink()
   if protected=='legacy_leftover':
    leftover=data/'strata/install';leftover.mkdir(parents=True);(leftover/'keep').write_text('runtime')
   if protected=='model_link':
@@ -25,6 +28,7 @@ class Migration(unittest.TestCase):
    r=subprocess.run(['bash',str(src/'migrate-openwebui.sh'),'--cleanup-only'],env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(data),'PATH':str(bin)+':'+os.environ['PATH']},input=answer,text=True,capture_output=True)
    return r.returncode,target.exists(),(custom/'SKILL.md').read_text() if (custom/'SKILL.md').exists() else 'removed'
  def test_cleanup_precedes_replacement_verification(self):self.assertEqual(self.fixture(1,'REMOVE OMP\nDELETE OLD OMP SKILLS\n'),(0,False,'removed'))
+ def test_unregistered_nested_partial_blocks_cleanup_and_retains_omp(self):self.assertEqual(self.fixture(0,'REMOVE OMP\n',protected='unregistered_corpus'),(1,True,'keep'))
  def test_decline_preserves_binary(self):self.assertEqual(self.fixture(0,'no\n'),(1,True,'keep'))
  def test_verified_explicit_removal_preserves_skills(self):self.assertEqual(self.fixture(0,'REMOVE OMP\nDELETE OLD OMP SKILLS\n'),(0,False,'removed'))
  def test_declined_legacy_cleanup_preserves_omp(self):self.assertEqual(self.fixture(0,'REMOVE OMP\n',legacy=1),(1,True,'keep'))

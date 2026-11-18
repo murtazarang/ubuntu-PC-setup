@@ -33,6 +33,11 @@ function Get-SafeLegacyLinks([string]$Path) {
         $link.FullName
     }
 }
+function Assert-LegacyCorpusAbsent([object[]]$Candidates) {
+    $allowed=@()
+    foreach($candidate in $Candidates){if(Test-Path -LiteralPath $candidate.Path){$allowed+=@(Get-SafeLegacyLinks $candidate.Path)}}
+    & (Join-Path $PSScriptRoot 'Assert-NoCorpus.ps1') -CandidatePaths @($Candidates|ForEach-Object {$_.Path}) -AllowedLinks $allowed
+}
 function Get-LocationDisposition([string]$Path, [object[]]$Candidates) {
     if ($Path -and [IO.Path]::IsPathRooted($Path)) {
         foreach ($candidate in $Candidates) {
@@ -143,6 +148,7 @@ function Invoke-LegacyCleanup {
     if ($env:OS -ne 'Windows_NT') { throw 'This patch is for native Windows.' }
     Show-ExistingQuarantines (Join-Path $env:LOCALAPPDATA 'PC-Setup\LegacyAI-Quarantine')
     $candidates = @(Get-LegacyCandidates)
+    Assert-LegacyCorpusAbsent $candidates
     $apps = @(Get-PaseoRegistration)
     Write-Host 'Old inference setup inventory:'
     foreach ($candidate in $candidates) { Write-Host ("[{0}] {1}" -f $candidate.Kind,$candidate.Path) }
@@ -166,6 +172,7 @@ function Invoke-LegacyCleanup {
     }
     }
     Assert-LegacyNotRunning $candidates
+    Assert-LegacyCorpusAbsent $candidates
     if ($apps.Count -or $candidates.Count) {
         Write-Warning 'The listed runtime/download paths will be permanently deleted, including models and local settings inside them. Paseo will be uninstalled. No quarantine is created. External/shared libraries and separate chat/settings roots remain untouched.'
         if ((Read-Host 'Type DELETE to uninstall/remove exactly the listed items; anything else cancels without changes') -cne 'DELETE') {
@@ -176,6 +183,7 @@ function Invoke-LegacyCleanup {
     }
     # Recheck after the user confirmation, immediately before any uninstall/deletion.
     Assert-LegacyNotRunning $candidates
+    Assert-LegacyCorpusAbsent $candidates
     $uninstalled = @{}
     foreach ($app in $apps) {
         if (-not $app.PSObject.Properties['UninstallString']) { throw 'Paseo has no registered uninstaller. Remove it in Windows Settings, then rerun.' }
@@ -195,6 +203,7 @@ function Invoke-LegacyCleanup {
     foreach ($c in $candidates) {
         try {
             if (-not (Test-Path -LiteralPath $c.Path)) { continue }
+            Assert-LegacyCorpusAbsent @($c)
             foreach ($link in @(Get-SafeLegacyLinks $c.Path)) {
                 # Nonrecursive removal deletes the junction, never its target.
                 [IO.Directory]::Delete($link)
