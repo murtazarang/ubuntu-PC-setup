@@ -6,8 +6,9 @@ New-Item -ItemType Directory $temp|Out-Null
 $oldDirectory=$env:PI_INSTALL_DIR
 $oldPath=[Environment]::GetEnvironmentVariable('Path','User')
 function global:Get-CimInstance { param($ClassName,$Filter) return @() }
-function global:Read-Host { param($Prompt) if($script:promptAction){& $script:promptAction}; return $script:answer }
-$script:promptAction=$null
+if(Test-Path Variable:\global:WebUIMigrationFixtureState){throw 'Fixture state collision'}
+$global:WebUIMigrationFixtureState=@{Action=$null;Answer=''}
+function global:Read-Host { param($Prompt) if($global:WebUIMigrationFixtureState.Action){& $global:WebUIMigrationFixtureState.Action}; return $global:WebUIMigrationFixtureState.Answer }
 try {
     $env:PI_INSTALL_DIR=Join-Path $temp 'omp'
     New-Item -ItemType Directory $env:PI_INSTALL_DIR|Out-Null
@@ -15,14 +16,14 @@ try {
     Set-Content -LiteralPath $exe -Value 'test only; not executable'
     $keep=Join-Path $env:PI_INSTALL_DIR 'custom-skill.txt'
     Set-Content -LiteralPath $keep -Value 'must survive'
-    $script:answer=''
+    $global:WebUIMigrationFixtureState.Answer=''
     & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
     if(-not(Test-Path $exe)){throw 'Decline incorrectly removed OMP'}
     $rejected=$false
     try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') } catch {$rejected=$true}
     if(-not $rejected){throw 'Missing verification gate was accepted'}
     [Environment]::SetEnvironmentVariable('Path',($oldPath+';'+$env:PI_INSTALL_DIR+';'+$env:PI_INSTALL_DIR+'-unrelated'),'User')
-    $script:answer='DELETE'
+    $global:WebUIMigrationFixtureState.Answer='DELETE'
     & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
     if(Test-Path $exe){throw 'Confirmed fake OMP file not removed'}
     if(-not(Test-Path $keep)){throw 'Unrelated file removed'}
@@ -31,14 +32,14 @@ try {
     if(($env:PI_INSTALL_DIR+'-unrelated') -notin $after){throw 'Unrelated PATH entry removed'}
     # Content replacement with identical size and mtime must still be rejected.
     Set-Content -LiteralPath $exe -Value 'aaaa'
-    $script:promptAction={
+    $global:WebUIMigrationFixtureState.Action={
         $stamp=(Get-Item -LiteralPath $exe).LastWriteTimeUtc
         Set-Content -LiteralPath $exe -Value 'bbbb'
         (Get-Item -LiteralPath $exe).LastWriteTimeUtc=$stamp
-    }
+    }.GetNewClosure()
     $rejected=$false
     try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
-    $script:promptAction=$null
+    $global:WebUIMigrationFixtureState.Action=$null
     if(-not $rejected -or -not(Test-Path $exe)){throw 'Same-size/mtime replacement was not preserved'}
     # Junction path is deliberately rejected even with confirmation.
     $linked=Join-Path $temp 'linked'
@@ -52,13 +53,13 @@ try {
     $env:PI_INSTALL_DIR=Join-Path $temp 'omp'
     $originalDirectory=$env:PI_INSTALL_DIR
     $movedDirectory=Join-Path $temp 'original-omp'
-    $script:promptAction={
+    $global:WebUIMigrationFixtureState.Action={
         Move-Item -LiteralPath $originalDirectory -Destination $movedDirectory
         New-Item -ItemType Junction -Path $originalDirectory -Target $movedDirectory|Out-Null
-    }
+    }.GetNewClosure()
     $rejected=$false
     try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
-    $script:promptAction=$null
+    $global:WebUIMigrationFixtureState.Action=$null
     if(-not $rejected -or -not(Test-Path (Join-Path $movedDirectory 'omp.exe'))){throw 'Ancestor swap during prompt was not preserved'}
     [IO.Directory]::Delete($originalDirectory)
     Move-Item -LiteralPath $movedDirectory -Destination $originalDirectory
@@ -81,6 +82,7 @@ try {
     $env:PI_INSTALL_DIR=$oldDirectory
     Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue
     Remove-Item Function:\Read-Host -ErrorAction SilentlyContinue
+    Remove-Variable -Name WebUIMigrationFixtureState -Scope Global -ErrorAction SilentlyContinue
     # Remove junction itself first; avoid traversing it during recursive fixture cleanup.
     foreach($candidate in @((Join-Path $temp 'linked'),(Join-Path $temp 'omp'))){
         if((Test-Path -LiteralPath $candidate) -and ((Get-Item -LiteralPath $candidate -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){[IO.Directory]::Delete($candidate)}

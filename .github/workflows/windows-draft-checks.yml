@@ -25,6 +25,15 @@ jobs:
       - name: Parse PowerShell without executing installers
         shell: pwsh
         run: ./windows/test-powershell.ps1
+      - name: Open WebUI migration fixtures (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/test-openwebui-migration.ps1
+      - name: Open WebUI migration fixtures (PowerShell 7)
+        shell: pwsh
+        run: ./windows/test-openwebui-migration.ps1
+      - name: Open WebUI lifecycle safe fixtures
+        shell: pwsh
+        run: uv run --no-project --with psutil==7.2.2 python windows/test_openwebui_desktop.py
       - name: Execute launcher binding test (Windows PowerShell 5.1)
         shell: powershell
         run: ./windows/test-launcher-binding.ps1
@@ -117,15 +126,6 @@ jobs:
       - name: Paseo registered uninstall arguments (PowerShell 7)
         shell: pwsh
         run: ./windows/test-paseo-uninstall.ps1
-      - name: Open WebUI migration fixtures (Windows PowerShell 5.1)
-        shell: powershell
-        run: ./windows/test-openwebui-migration.ps1
-      - name: Open WebUI migration fixtures (PowerShell 7)
-        shell: pwsh
-        run: ./windows/test-openwebui-migration.ps1
-      - name: Open WebUI lifecycle safe fixtures
-        shell: pwsh
-        run: uv run --no-project --with psutil==7.2.2 python windows/test_openwebui_desktop.py
       - name: Colibri native Serve shortcut (Windows PowerShell 5.1)
         shell: powershell
         run: ./windows/tests/test-colibri-serve-shortcut.ps1
