@@ -7,8 +7,11 @@ import subprocess
 
 
 def quote(value):
-    # Desktop Entry Exec quoting: shell metacharacters have no shell meaning.
-    return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%') + '"'
+    # First quote an Exec argument, then apply Desktop Entry string escaping.
+    # GKeyFile decodes general escapes before GIO parses the Exec arguments.
+    inner = '"' + str(value).replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%') + '"'
+    return inner.replace('\\', '\\\\')
+
 
 
 def write_entry(path, text):
@@ -21,7 +24,7 @@ def write_entry(path, text):
 
 def install(cli, model, icon, dual, home=None, image=False, python=None):
     home = Path(home or Path.home())
-    env = ['-u', 'COLI_VK_DEV2', '-u', 'COLI_DENSE_BITS', 'COLI_CUDA=0', 'COLI_VULKAN=1', 'COLI_NO_OMP_TUNE=1']
+    env = ['-u', 'COLI_VK_DEV2', '-u', 'COLI_DENSE_BITS', '-u', 'COLI_DENSE_INT4', 'COLI_CUDA=0', 'COLI_VULKAN=1', 'COLI_NO_OMP_TUNE=1']
     if dual and not image:
         env.append('COLI_VK_DEV2=auto')
     name = 'Colibri Serve Image' if image else 'Colibri Serve'

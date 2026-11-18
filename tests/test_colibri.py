@@ -100,3 +100,45 @@ class NativeUILaunchTests(unittest.TestCase):
    self.assertEqual(r.returncode,0,r.stderr)
    commands=[json.loads(x) for x in calls.read_text().splitlines()]
    self.assertEqual([c[0] for c in commands],['serve','ui']);self.assertIn('http://127.0.0.1:'+ports[0],commands[1])
+
+class DesktopGioTests(unittest.TestCase):
+ def test_gio_launch_preserves_special_arguments(self):
+  import importlib.util, shutil,sys,time
+  if not shutil.which('gio'): self.skipTest('GIO is unavailable')
+  spec=importlib.util.spec_from_file_location('shortcuts',ROOT/'create-colibri-shortcuts.py')
+  m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);out=p/'args.json';desktop=p/'test.desktop'
+   values=['a\\b $d `x` "quote" % percent',"exec('print(\\\"safe\\\")\\n')",'/a path/model']
+   code='import json,sys;open('+repr(str(out))+',"w").write(json.dumps(sys.argv[1:]))'
+   desktop.write_text('[Desktop Entry]\nType=Application\nName=Test\nTerminal=false\nExec='+ ' '.join(m.quote(x) for x in [sys.executable,'-c',code,*values])+'\n')
+   r=subprocess.run(['gio','launch',str(desktop)],capture_output=True,text=True)
+   self.assertEqual(r.returncode,0,r.stderr)
+   for _ in range(100):
+    if out.exists():break
+    time.sleep(.02)
+   self.assertTrue(out.exists(),r.stderr);self.assertEqual(json.loads(out.read_text()),values)
+ def test_generated_text_entry_executes_both_native_commands(self):
+  import importlib.util,shutil,sys,time,unittest.mock,socket
+  if not shutil.which('gio'): self.skipTest('GIO is unavailable')
+  for port in (8000,8790):
+   s=socket.socket()
+   try:s.bind(('127.0.0.1',port))
+   except OSError:self.skipTest('Fixture port occupied')
+   finally:s.close()
+  spec=importlib.util.spec_from_file_location('shortcuts',ROOT/'create-colibri-shortcuts.py')
+  m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);cli=p/'coli $quoted';calls=p/'calls'
+   cli.write_text("import json,pathlib,sys,time\np=pathlib.Path("+repr(str(calls))+");f=p.open('a');f.write(json.dumps(sys.argv[1:])+'\\n');f.close();time.sleep(2 if sys.argv[1]=='serve' else 0.1)")
+   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(p/'data')}),unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
+    m.install(str(cli),str(p/'model $x'),'/icon.svg',False,p,python=sys.executable)
+   desktop=p/'Desktop/Colibri Serve.desktop'
+   desktop.write_text(desktop.read_text().replace('Terminal=true','Terminal=false'))
+   r=subprocess.run(['gio','launch',str(desktop)],capture_output=True,text=True,timeout=10)
+   self.assertEqual(r.returncode,0,r.stderr)
+   for _ in range(200):
+    if calls.exists() and len(calls.read_text().splitlines())==2:break
+    time.sleep(.02)
+   commands=[json.loads(x) for x in calls.read_text().splitlines()]
+   self.assertEqual([c[0] for c in commands],['serve','ui']);self.assertIn(str(p/'model $x'),commands[0])
