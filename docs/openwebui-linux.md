@@ -48,3 +48,5 @@ PyTorch backend selection: https://docs.astral.sh/uv/guides/integration/pytorch/
 ### Existing OMP migration
 
 After the local WebUI account exists and its services are running, run `./migrate-openwebui.sh`. It first requires successful full skill and connection import/readback. It then offers to remove only `~/.local/bin/omp`, the official standalone installer default used by this repository. Type `REMOVE OMP` for that exact deletion. Alternate installations, Bun, skill files, custom settings, conversations and Wikipedia remain untouched. This script never removes data when import verification fails.
+
+See [shared verification and skill interoperability limits](openwebui-verification.md).

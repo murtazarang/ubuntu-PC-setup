@@ -29,3 +29,5 @@ Python ownership tests exercise PID-reuse and command-change guards and terminat
 NVIDIA GPU supporting models are approved; PyTorch 2.9.1 CUDA 12.8 wheels are selected and CUDA availability is checked during installation and UI launch. Intel's WebUI supporting-model backend remains pending and this candidate refuses a silent CPU fallback. Colibri inference still uses Vulkan. OpenZIM runs in its own Python 3.12 environment; mcpo has an isolated Python environment pinned to mcpo0.0.20, mcp1.30.0 and FastAPI0.115.12.
 
 CUDA wheel source: https://pytorch.org/get-started/previous-versions/#v291. WebUI supporting PyTorch models use CUDA; this is not evidence that Whisper CTranslate2 or every optional tool can use the GPU. Their additional CUDA/cuDNN dependencies and hardware behavior need separate validation.
+
+See [shared verification and skill interoperability limits](../docs/openwebui-verification.md).
