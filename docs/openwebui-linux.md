@@ -55,12 +55,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/
 
 You can append `NvidiaSingle`, `NvidiaDual`, or `Intel` if automatic hardware detection is unavailable. This dedicated path provisions only the replacement AI stack and missing AI prerequisites. It reuses or resumes Wikipedia, prepares the complete skill collections and models, starts Open WebUI, and waits for you to create/sign in to its local account. It does not run desktop/system setup, alter drivers, or install unrelated apps.
 
-Authenticated skill/connection/corpus verification must succeed before cleanup. The script then asks separately before legacy runtime/model deletion and OMP removal. Declining either leaves migration incomplete; it never claims cleanup succeeded. Active replacement data inside a legacy deletion tree blocks cleanup until deliberately relocated. Skills, user settings, conversations and Wikipedia are retained.
+The migration inventories/protects Wikipedia and any existing new-stack data, then explicitly confirms removal of the old runtimes, old skill copies and old-owned settings/history/caches BEFORE installing replacements. Confirmed custom edits and additions inside old roots are deleted too. Unknown/shared paths block cleanup instead of being guessed disposable. Declining cleanup stops the process; a later installation failure cannot restore deleted data. Wikipedia and unrelated/new-stack data remain protected.
 
 If provisioning already completed, resume verification and cleanup from any terminal directory:
 
 ```bash
-bash "${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui/migrate-openwebui.sh"
+bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/migrate-existing-ai.sh)
 ```
 
 OMP discovery covers the default standalone path, the official `PI_INSTALL_DIR` override if set, and the official package in Bun/npm global installations. Off-PATH custom directories whose override is no longer available cannot be discovered automatically; restore that variable before migration. Unknown paths stop cleanup. Linked development packages are uninstalled through their package manager, never by recursively deleting the source checkout. Close OMP before starting cleanup.

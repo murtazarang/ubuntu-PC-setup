@@ -20,24 +20,15 @@ if(-not $ArchiveDirectory){
 }
 if(-not $ArchiveDirectory){throw 'Existing reference manifest has no archive directory; supply -ArchiveDirectory explicitly.'}
 # BEGIN migration stages
-& (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
-& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware -NoShortcut
-& (Join-Path $PSScriptRoot 'Install-OpenWebUI.ps1')
-foreach($file in @('Remove-VerifiedOMP.ps1','Remove-OMPBinary.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $root -Force}
-$python=Join-Path $root 'venv\Scripts\python.exe'
-& $python (Join-Path $root 'openwebui_desktop.py') ui --root $root
-if($LASTEXITCODE -ne 0){throw 'Open WebUI did not start. Old software remains.'}
-Write-Host 'Create your local Open WebUI account in the browser if this is its first launch. Existing accounts/settings remain.'
-Read-Host 'Press Enter once your local account is ready; the next step verifies imports and Wikipedia before cleanup'
-& $python (Join-Path $root 'openwebui_skills.py') import --root (Join-Path $root 'skill-repos') --url http://127.0.0.1:8080 --wiki-key-file (Join-Path $root 'wikipedia-api-key') --reference-manifest $reference
-if($LASTEXITCODE -ne 0){throw 'Replacement skills/connections/archive verification failed. No legacy uninstall was started.'}
 # Reject even confirmed legacy deletion when it overlaps active replacement data.
 . (Join-Path $PSScriptRoot 'Remove-LegacyAI.ps1')
 $legacyPaths=@(Get-LegacyCandidates|ForEach-Object {$_.Path})
-$activeReference=Get-Content -LiteralPath $reference -Raw|ConvertFrom-Json
-$activeColibri=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json') -Raw|ConvertFrom-Json
+$activeReference=if(Test-Path -LiteralPath $reference){Get-Content -LiteralPath $reference -Raw|ConvertFrom-Json}else{[pscustomobject]@{archive_directory=$ArchiveDirectory;archive=(Join-Path $ArchiveDirectory 'wikipedia_en_all_nopic_2026-06.zim')}}
+$colibriSettings=Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json'
+$activeColibri=if(Test-Path -LiteralPath $colibriSettings){Get-Content -LiteralPath $colibriSettings -Raw|ConvertFrom-Json}else{[pscustomobject]@{models=(Join-Path $env:USERPROFILE 'colibri-models')}}
 $protected=@($root,[string]$activeReference.archive,[string]$activeReference.archive_directory,[string]$activeColibri.models,(Join-Path $env:LOCALAPPDATA 'OMP-Skills'),(Join-Path $env:USERPROFILE '.omp'))
-$desktopConfig=Get-Content -LiteralPath (Join-Path $root 'desktop.json') -Raw|ConvertFrom-Json
+$desktopFile=Join-Path $root 'desktop.json'
+$desktopConfig=if(Test-Path -LiteralPath $desktopFile){Get-Content -LiteralPath $desktopFile -Raw|ConvertFrom-Json}else{[pscustomobject]@{text_model=(Join-Path $activeColibri.models 'dense27b\model');image_model=(Join-Path $activeColibri.models 'qwen-image-2.1\model')}}
 foreach($modelPath in @([string]$desktopConfig.text_model,[string]$desktopConfig.image_model)){
     if(-not $modelPath -or -not [IO.Path]::IsPathRooted($modelPath)){throw 'Active desktop model paths must be absolute before legacy cleanup.'}
     $protected+=$modelPath
@@ -67,8 +58,24 @@ if($desktopConfig.PSObject.Properties.Name -contains 'webui_environment'){
 }
 
 & (Join-Path $PSScriptRoot 'Assert-MigrationPaths.ps1') -CandidatePaths $legacyPaths -ProtectedPaths $protected
-# Preserve retired OMP settings: migration explicitly skips old provider edits.
+# Destructive-first order explicitly requested: preflight every known data path, then confirm each removal.
+$oldCollections=Join-Path $env:LOCALAPPDATA 'OMP-Skills'
+$oldOmpState=Join-Path $env:USERPROFILE '.omp'
+$skillProtected=@($protected|Where-Object {$_ -ine $oldCollections -and $_ -ine $oldOmpState})
+& (Join-Path $PSScriptRoot 'Remove-OldSkillCollections.ps1') -CleanupAuthorizedThisRun -ProtectedPaths $skillProtected -InventoryOnly
+& (Join-Path $PSScriptRoot 'Remove-VerifiedOMP.ps1') -CleanupAuthorizedThisRun -InventoryOnly
 & (Join-Path $PSScriptRoot 'Remove-LegacyAI.ps1') -Apply -RequireRemoval -SkipOmpConfig
-& (Join-Path $root 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
+& (Join-Path $PSScriptRoot 'Remove-OldSkillCollections.ps1') -CleanupAuthorizedThisRun -ProtectedPaths $skillProtected
+& (Join-Path $PSScriptRoot 'Remove-VerifiedOMP.ps1') -CleanupAuthorizedThisRun
+& (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
+& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware -NoShortcut
+& (Join-Path $PSScriptRoot 'Install-OpenWebUI.ps1')
+$python=Join-Path $root 'venv\Scripts\python.exe'
+& $python (Join-Path $root 'openwebui_desktop.py') ui --root $root
+if($LASTEXITCODE -ne 0){throw 'Open WebUI did not start. The old stack has already been removed as requested; rerun migration to retry setup.'}
+Write-Host 'Create your local Open WebUI account in the browser if this is its first launch. Existing accounts/settings remain.'
+Read-Host 'Press Enter once your local account is ready; the next step verifies the replacement imports and Wikipedia'
+& $python (Join-Path $root 'openwebui_skills.py') import --root (Join-Path $root 'skill-repos') --url http://127.0.0.1:8080 --wiki-key-file (Join-Path $root 'wikipedia-api-key') --reference-manifest $reference
+if($LASTEXITCODE -ne 0){throw 'Replacement verification failed after the requested old-stack removal. Rerun migration to continue; Wikipedia remains.'}
 # END migration stages
 Write-Host 'Existing-PC AI migration completed. Colibri/Open WebUI are ready; unrelated desktop applications/settings were not changed.'

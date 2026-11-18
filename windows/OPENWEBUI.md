@@ -8,7 +8,7 @@ The Desktop stage uses Colibri + Open WebUI, **not Oh My Pi**. Python is managed
 4. Double-click **Finish Open WebUI Setup**, sign in to that local account when prompted, and wait for complete skill import and verification. All three original repositories are retained on disk, including reference files and scripts. A skill definition does not by itself execute its optional tools or make cloud APIs available.
 5. Use **Stop Colibri Model** to release RAM/VRAM. No terminal has to stay open. Choose the other Serve shortcut to switch models; the Open WebUI model picker does not load/unload Colibri weights.
 
-Full collections: K-Dense-AI scientific-agent-skills, K-Dense-AI claude-scientific-writer, GarethManning education-agent-skills. Fresh setup performs no legacy discovery or cleanup. The separate existing-PC migration preserves old/custom skill copies when safe equivalence has not been established, even after verification.
+Full collections: K-Dense-AI scientific-agent-skills, K-Dense-AI claude-scientific-writer, GarethManning education-agent-skills. Fresh setup performs no legacy discovery or cleanup. The separate existing-PC migration explicitly deletes identified old skill copies and old-owned app data first, including edits, after exact runtime confirmation. It protects Wikipedia and unrelated/new-stack data.
 
 The Wikipedia bridge is OpenZIM MCP 3.4.0 through Open WebUI's mcpo 0.0.20. WebUI 0.13.4 runs on Python 3.11. Ports: text8000, image8001, Wikipedia8002, WebUI8080; all loopback only. The fixed data directory preserves chats/accounts across reruns. Existing desktop/runtime configuration is preserved rather than reset.
 

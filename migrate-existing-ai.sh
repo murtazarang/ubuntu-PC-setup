@@ -26,16 +26,6 @@ PYZIP
  exec bash "$temp/ubuntu-PC-setup-main/migrate-existing-ai.sh" "$profile"
 fi
 export PATH="$HOME/.local/bin:$PATH"
-# Install only missing AI prerequisites, never drivers, gaming apps, Firefox or full desktop settings.
-missing=false
-for tool in curl git python3 tar sha256sum lspci; do command -v "$tool" >/dev/null || missing=true;done
-if [[ $missing == true ]]; then
- sudo apt-get update
- sudo apt-get install --no-install-recommends -y curl git python3 pciutils ca-certificates coreutils tar
-fi
-if ! command -v uv >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh;fi
-command -v uv >/dev/null
-systemctl --user show-environment >/dev/null
 base="${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui"
 # Reuse the verified corpus location from the existing stack; never silently
 # download a second archive before discovering a different reference manifest.
@@ -53,7 +43,18 @@ PYARCHIVE
  )
  export KIWIX_ARCHIVE_DIR
 fi
-# Old OMP/Strata/Paseo and all user data remain available until verification succeeds.
+# Explicitly approved delete-first migration; no replacement verification gate.
+bash "$here/migrate-openwebui.sh" --cleanup-only
+# Install only missing AI prerequisites, never drivers, gaming apps, Firefox or full desktop settings.
+missing=false
+for tool in curl git python3 tar sha256sum lspci; do command -v "$tool" >/dev/null || missing=true;done
+if [[ $missing == true ]]; then
+ sudo apt-get update
+ sudo apt-get install --no-install-recommends -y curl git python3 pciutils ca-certificates coreutils tar
+fi
+if ! command -v uv >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh;fi
+command -v uv >/dev/null
+systemctl --user show-environment >/dev/null
 bash "$here/configure-skills.sh"
 bash "$here/download-wikipedia.sh"
 bash "$here/configure-ai.sh" "$profile"
@@ -64,7 +65,7 @@ import pathlib,sys,shutil,json,hashlib
 source,dest=map(pathlib.Path,sys.argv[1:])
 # Exact unmodified migration helper published in repository commit 7efa03d.
 known={'migrate-openwebui.sh':['472517c89ec78e5e57c22b0660b0832aa210be74f81936836085ea816d0cab77']}
-names=['migrate-openwebui.sh','remove-omp-runtime.py','remove-legacy-ai.sh']
+names=['migrate-openwebui.sh','remove-omp-runtime.py','remove-legacy-ai.sh','remove-old-omp-skills.py']
 for name in names:
  src=source/name;target=dest/name
  if not src.is_file():raise SystemExit('Missing migration companion: '+str(src))
@@ -74,6 +75,6 @@ for name in names:shutil.copyfile(source/name,dest/name)
 PYMIGRATE
 bash "$base/launch-webui.sh"
 echo 'Create or sign in to your local Open WebUI account in the browser at http://127.0.0.1:8080.'
-read -r -p 'Press Enter when your account is ready to verify skills/Wikipedia and begin confirmed legacy cleanup: ' _
-bash "$base/migrate-openwebui.sh"
+read -r -p 'Press Enter when your account is ready to import and verify skills/Wikipedia: ' _
+bash "$base/finish-openwebui.sh"
 echo 'Existing-PC AI migration finished. Unrelated desktop applications and settings were not changed.'

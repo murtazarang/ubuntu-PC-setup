@@ -20,7 +20,7 @@ For mcpo 0.0.20, the verified compatibility pins are MCP 1.30.0 and FastAPI 0.11
 
 ## Migration safety
 
-Before offering removal of the old OMP program, migration rechecks the complete Wikipedia archive against the installer's publisher-checksum verification record and imports/reads back the skills and local connections. It then inventories the default and explicit install-directory binaries, current executable PATH, and recognized Bun/npm global package installations. Confirmation names the exact program paths or package. Cleanup verifies absence in those scopes afterward; unknown/custom installations stop it rather than being guessed at. Unset, off-PATH custom directories cannot be discovered automatically. Original skills, configuration, conversations, source checkouts and Wikipedia remain untouched, as do shared Bun/Node runtimes and unrelated packages. If migration verification fails, no OMP removal is offered.
+The separate existing-PC migration now follows the explicitly requested delete-first order: inventory/protect Wikipedia and unrelated/new-stack data, confirm removal of identified old runtimes and old-owned skills/settings/history/caches, then install and verify replacements. It does not require replacement verification before deleting the old stack. Each destructive operation is explicit and irreversible; later installation failure does not restore removed files. Known default/explicit binaries and Bun/npm registrations are checked, while unknown/shared ownership stops cleanup. Fresh installation performs no legacy discovery or cleanup.
 
 NVIDIA production setup selects CUDA dependencies for WebUI supporting models and verifies WebUI actually selects CUDA. Colibri retains its existing Vulkan configuration. CUDA PyTorch alone does not prove Faster Whisper's separate cuBLAS/cuDNN requirements are satisfied. Intel B580 document embeddings and reranking use explicitly selected OpenVINO GPU execution, with errors instead of CPU fallback. Speech acceleration remains undecided.
 
@@ -44,8 +44,7 @@ Source contracts:
 - [Sentence Transformers OpenVINO backend](https://sbert.net/docs/sentence_transformer/usage/efficiency.html#openvino)
 - [OpenVINO device discovery](https://docs.openvino.ai/2023.3/notebooks/002-openvino-api-with-output.html)
 
-Existing skill repositories and `.omp` data remain preserved after the optional
-verified OMP executable removal. They have not been deleted or silently moved.
+The separate migration deletes confirmed old skill repositories and old `.omp` data, including local edits and history, before installing replacements. Fresh setup never performs this cleanup. No target-PC deletion has been performed by these repository tests.
 
 Approved model sources: [BGE small English v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5), [MiniLM L6 MS MARCO reranker](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L6-v2). The BGE prefix is applied only to queries through native WebUI configuration, not to stored passages or reranker inputs.
 

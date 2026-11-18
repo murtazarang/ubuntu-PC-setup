@@ -35,14 +35,19 @@ jobs:
         shell: powershell
         run: |
           ./windows/test-ai-migration-flow.ps1
+          ./windows/test-old-skill-cleanup.ps1
           ./windows/test-omp-discovery.ps1
           ./windows/test-openwebui-shortcut.ps1
       - name: OMP package discovery and uninstall fixtures (PowerShell 7)
         shell: pwsh
         run: |
           ./windows/test-ai-migration-flow.ps1
+          ./windows/test-old-skill-cleanup.ps1
           ./windows/test-omp-discovery.ps1
           ./windows/test-openwebui-shortcut.ps1
+      - name: Old OMP profile inventory fixtures
+        shell: pwsh
+        run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -p test_old_omp_inventory.py -v
       - name: Open WebUI lifecycle safe fixtures
         shell: pwsh
         run: uv run --no-project --with psutil==7.2.2 python windows/test_openwebui_desktop.py

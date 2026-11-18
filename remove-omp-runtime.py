@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Remove only recognized OMP runtimes after verified migration, never user data.
+"""Remove only recognized OMP runtimes during explicitly confirmed replacement, never user data.
 Upstream: omp.sh/install (standalone and Bun), bun pm/remove docs, npm ls/uninstall docs.
 """
-import hashlib,json,os,pathlib,re,shutil,subprocess
+import hashlib,json,os,pathlib,re,shutil,subprocess,sys
 PACKAGE='@oh-my-pi/pi-coding-agent'
 
 def run(args, allowed=(0,)):
@@ -80,7 +80,7 @@ def uninstall(input_fn=input):
     if not records:
         print('No OMP runtime found in the default locations, current PATH or inspected Bun/npm global packages.');return
     ensure_stopped(records)
-    print('Verified migration. OMP runtime inventory:',flush=True)
+    print('OMP runtime inventory:',flush=True)
     for r in records:print(' - '+r['kind']+': '+r.get('path',r.get('bin','')),flush=True)
     print('Skills, chats, settings, Wikipedia, shared packages and Bun/Node are retained.',flush=True)
     if input_fn('Type REMOVE OMP to uninstall these runtimes: ')!='REMOVE OMP':raise RuntimeError('OMP retained at your request; runtime removal is incomplete.')
@@ -99,5 +99,12 @@ def uninstall(input_fn=input):
     print('OMP runtime absence verified in current PATH, default locations and inspected package managers.')
 
 if __name__=='__main__':
-    try:uninstall()
+    try:
+        if sys.argv[1:] == ['--check']:
+            ensure_stopped(discover())
+            print('OMP runtime/process preflight passed; no runtime removed.')
+        elif sys.argv[1:]:
+            raise RuntimeError('Usage: remove-omp-runtime.py [--check]')
+        else:
+            uninstall()
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:raise SystemExit(str(exc))

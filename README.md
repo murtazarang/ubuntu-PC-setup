@@ -64,7 +64,7 @@ Use the **Colibri Serve** and **Colibri Serve Image** desktop shortcuts to start
 
 Setup also downloads the native Qwen-Image-2.1 checkpoint (about 33 GB) with the same resume/hash/reuse checks, and creates **Colibri Serve Image** with a **Serve Img** icon label. It invokes upstream `coli web` directly on loopback port **8001**, using isolated Python with NumPy and Pillow. Text Serve uses **8000**. Run one at a time unless memory permits both; separate ports do not guarantee enough combined GPU/RAM capacity. Image generation is distinct from the text model's input capabilities. The image checkpoint's license limits use to research/evaluation; read its downloaded LICENSE before use. The image shortcut opens the upstream image-generation web frontend automatically. The modern `coli ui` does not implement image generation, so it is used only for text. No third desktop UI shortcut is created.
 
-For an existing setup, use the [dedicated AI migration workflow](#existing-ubuntu-pcs-ai-migration-only), not the fresh Desktop stage. It verifies the replacement before explicit cleanup. The standalone `remove-legacy-ai.sh` remains a cleanup-only inventory tool; it is not the complete replacement installer.
+For an existing setup, use the [dedicated AI migration workflow](#existing-ubuntu-pcs-ai-migration-only), not the fresh Desktop stage. It removes the confirmed old stack and skill/app-data roots first, then installs the new stack; Wikipedia and unrelated/new-stack data are protected. The standalone `remove-legacy-ai.sh` remains a cleanup-only inventory tool; it is not the complete replacement installer.
 
 Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.
 
@@ -116,4 +116,4 @@ Do not rerun full desktop setup to replace the old AI stack. Run:
 bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/migrate-existing-ai.sh)
 ```
 
-This dedicated path provisions only the replacement AI stack, verifies it after local signup, then offers confirmed legacy cleanup. Fresh installation instead uses the import-only `finish-openwebui.sh` and never runs migration/cleanup. See [exact migration and first-use steps](docs/openwebui-linux.md#existing-pc-migration-separate-from-fresh-setup).
+This dedicated path inventories and confirms irreversible old-stack/skill/app-data deletion first, retaining Wikipedia, then provisions the replacement AI stack and verifies it after local signup. Failure after deletion cannot restore the removed data. Fresh installation instead uses the import-only `finish-openwebui.sh` and never runs migration/cleanup. See [exact migration and first-use steps](docs/openwebui-linux.md#existing-pc-migration-separate-from-fresh-setup).

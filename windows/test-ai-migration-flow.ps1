@@ -26,8 +26,9 @@ try {
         Set-Content (Join-Path $temp $name) "Add-Content -LiteralPath `$env:TEST_AI_LOG -Value '$name'"
     }
     Set-Content (Join-Path $temp 'Remove-LegacyAI.ps1') 'param([switch]$Apply,[switch]$RequireRemoval,[switch]$SkipOmpConfig); if($MyInvocation.InvocationName -eq "."){function Get-LegacyCandidates {if($env:TEST_LEGACY_ROOT){return [pscustomobject]@{Path=$env:TEST_LEGACY_ROOT}};return @()};return}; if(-not($Apply -and $RequireRemoval -and $SkipOmpConfig)){throw "Missing migration guards"}; Add-Content $env:TEST_AI_LOG legacy; if($env:TEST_FAIL_LEGACY -eq "1"){throw "Declined fixture"}'
-    Set-Content (Join-Path $temp 'Remove-VerifiedOMP.ps1') 'param([switch]$MigrationVerifiedThisRun);if(-not $MigrationVerifiedThisRun){throw "Missing verification gate"};Add-Content $env:TEST_AI_LOG omp'
+    Set-Content (Join-Path $temp 'Remove-VerifiedOMP.ps1') 'param([switch]$CleanupAuthorizedThisRun,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing authorization gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG omp-inventory}else{Add-Content $env:TEST_AI_LOG omp}'
     Set-Content (Join-Path $temp 'Remove-OMPBinary.ps1') '# inert fixture'
+    Set-Content (Join-Path $temp 'Remove-OldSkillCollections.ps1') 'param([switch]$CleanupAuthorizedThisRun,[string[]]$ProtectedPaths,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG old-inventory}else{Add-Content $env:TEST_AI_LOG old-skills}'
     $driver=Join-Path $temp 'driver.ps1'
     Set-Content $driver ('$ErrorActionPreference="Stop";$root=$env:TEST_AI_ROOT;$Hardware="NvidiaSingle";$ArchiveDirectory="C:\fixture";$reference=Join-Path $env:LOCALAPPDATA "reference.json"'+[Environment]::NewLine+$block)
     foreach($case in @('import-fails','legacy-declines','success','linked-weights')){
@@ -53,16 +54,21 @@ try {
         } finally {$ErrorActionPreference=$previousErrorAction}
         $events=@(Get-Content $env:TEST_AI_LOG)
         if('text' -in $events -or 'image' -in $events){throw 'Migration must not start or switch a model'}
-        if($case -eq 'success'){
-            if($code -ne 0 -or $events[-2] -ne 'legacy' -or $events[-1] -ne 'omp'){throw 'Successful migration ordering failed'}
-        }elseif($code -eq 0 -or 'omp' -in $events){throw "$case did not block OMP removal"}
-        if($case -in @('import-fails','linked-weights') -and 'legacy' -in $events){throw 'Unverified import reached legacy cleanup'}
+        if($case -eq 'success' -or $case -eq 'import-fails'){
+            $legacyIndex=[array]::IndexOf($events,'legacy');$skillsIndex=[array]::IndexOf($events,'old-skills');$ompIndex=[array]::IndexOf($events,'omp');$installIndex=[array]::IndexOf($events,'Install-Reference.ps1')
+            if($legacyIndex -lt 0 -or $skillsIndex -le $legacyIndex -or $ompIndex -le $skillsIndex -or $installIndex -le $ompIndex){throw 'Cleanup must occur before any replacement installation'}
+            if($case -eq 'success' -and $code -ne 0){throw 'Successful migration failed'}
+            if($case -eq 'import-fails' -and $code -eq 0){throw 'Replacement import failure was falsely reported as complete'}
+        }else{
+            if($code -eq 0 -or 'omp' -in $events -or 'old-skills' -in $events -or 'Install-Reference.ps1' -in $events){throw "$case must block later cleanup and installation"}
+            if($case -eq 'linked-weights' -and 'legacy' -in $events){throw 'Active linked weights must block ALL deletion'}
+        }
     }
     & (Join-Path $PSScriptRoot 'Assert-MigrationPaths.ps1') -CandidatePaths @('C:\legacy') -ProtectedPaths @('C:\wiki')
     $blocked=$false
     try {& (Join-Path $PSScriptRoot 'Assert-MigrationPaths.ps1') -CandidatePaths @('C:\legacy') -ProtectedPaths @('C:\legacy\wiki.zim')}catch{$blocked=$true}
     if(-not $blocked){throw 'Active corpus overlap was not blocked'}
-    Write-Host 'AI-only migration stages passed: verification gate, decline gate, legacy-before-OMP and no unrelated stage.'
+    Write-Host 'AI-only migration stages passed: destructive-first order, decline gate, legacy-before-OMP and no unrelated stage.'
 }finally{
     foreach($key in $old.Keys){[Environment]::SetEnvironmentVariable($key,$old[$key],'Process')}
     Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue

@@ -1,29 +1,34 @@
 # Existing Windows PC: replace only the AI stack
 
-Do **not** rerun `Setup.ps1 -Stage Desktop` for this migration. Fresh setup and existing-PC migration are separate workflows.
+This is the **delete-old-first** migration requested for an existing PC. It does not run the fresh `Setup.ps1 -Stage Desktop` workflow.
 
-Close old Strata/XeStrata/Paseo/OMP sessions first. Open PowerShell as administrator under the existing user's account and run:
+Close old Strata/XeStrata/Paseo/OMP sessions. Open PowerShell as administrator under the existing user's account:
 
 ```powershell
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/migrate-ai.ps1 | iex
 ```
 
-Choose your PC when prompted. This launcher uses the already-installed PowerShell 7, uv, Git and curl. Missing prerequisites cause a specific error rather than running unrelated installers. The full repository ZIP is downloaded for companion files, but only `Migrate-ExistingAI.ps1` runs.
+Choose the PC when prompted. The launcher uses existing PowerShell 7, uv, Git and curl. It downloads companion scripts but runs only `Migrate-ExistingAI.ps1`. It does not run Windows Update, drivers, Firefox, PowerToys, unrelated applications or disk formatting.
 
-The migration:
-1. Reuses the existing OpenZIM reference manifest's archive location and verifies the corpus checksum. Without a manifest it uses the original default archive directory. Pass `-ArchiveDirectory` to the downloaded `Migrate-ExistingAI.ps1` if you moved the corpus.
-2. Provisions Colibri and Open WebUI and their supporting GPU models/complete skill collections. Existing verified model artifacts are reused.
-3. Starts WebUI and the Wikipedia bridge only; it does not start or switch text/image model servers. Create your local account in the browser on first launch, then return to the terminal. No cloud account is created.
-4. Imports and reads back the complete skill packages, verifies the persisted connections/retrieval settings and rechecks Wikipedia. Failure stops before uninstalling anything.
-5. Checks that no active corpus, replacement model directory, WebUI data/skills, or preserved OMP skill/config root overlaps a proposed legacy deletion.
-6. Runs the existing exact-confirmation Paseo/Strata/XeStrata cleanup, then confirmed OMP program removal. Declining cleanup means migration is incomplete, not success. Retired OMP configuration is preserved rather than edited through its old CLI.
+## Order and irreversible removal
 
-It does not run Windows Update, GPU-driver setup, Firefox, PowerToys, other desktop application installers, or disk formatting. Existing accounts/chat/settings, custom skills, separate model libraries and Wikipedia remain. Displayed legacy runtime directories can contain old model files: the permanent-deletion confirmation explicitly covers those paths, so read it before agreeing.
+1. Inventory the old stack and configured skill roots. Protect the existing/default Wikipedia archive location and any existing replacement Colibri/WebUI models/data. Linked paths, overlap with protected data, and unknown/shared custom locations stop the migration before deletion rather than being guessed disposable.
+2. Uninstall Paseo and delete the explicitly listed old Strata/XeStrata runtime/download directories. Confirm their permanent deletion when asked.
+3. Delete identified old skill collections and app data, **including modifications, custom additions, histories, settings and caches inside those listed roots**. Each directory requires typing its exact full path. The three old `%LOCALAPPDATA%\OMP-Skills` collection directories are individually removed, not their parent containing unrelated siblings. Source-owned default data roots include `%USERPROFILE%\.omp`, `%USERPROFILE%\.paseo`, and `%APPDATA%\Paseo`, `Strata`, and `xestrata`. No quarantine is created.
+4. Remove the identified OMP program installation through the supported binary/Bun/npm path and verify executable absence. Node/Bun themselves and other packages remain.
+5. Install the replacement Colibri/Open WebUI stack, download/import its models and complete new skill collections, and verify GPU support. Retained verified artifacts and Wikipedia are reused.
+6. Open WebUI without switching or starting a model. Create its local account, then return to the terminal for authenticated skill/connection/corpus verification. Use the new model shortcuts afterward.
 
-Use the new **Colibri Serve**, **Colibri Serve Image**, **Stop Colibri Model** and **Open WebUI** shortcuts afterward. Fresh **Finish Open WebUI Setup** only finishes imports/configuration and never removes old software. Cleanup belongs to the separate migration command.
+**If replacement installation fails, the old software may already be gone.** This is deliberately not a transactional migration or rollback. Wikipedia and unrelated/new-stack data remain; rerun this AI-only migration to continue. Declining a deletion reports incomplete cleanup, not success.
 
-Migration files are retained under `%LOCALAPPDATA%\PC-Setup\AI-Migration` after an error. Rerun the AI migration, not the full desktop setup. The migration refuses unknown installations or live ownership rather than guessing which processes/files to remove.
+Nondefault app-data overrides and skill roots outside known owned directories are printed as blockers for ownership review. They are not silently retained while claiming a complete cleanup, and shared/foreign directories are not recursively deleted based only on an OMP reference. All stored default/named OMP profile YAML/JSON configurations are parsed read-only, including when the old CLI is absent. The parser uses uv and PyYAML as an inventory utility, not a new AI-stack installation. Nondefault external overlays are explicit ownership-review blockers.
 
-## Verification limits
+Recovery files remain under `%LOCALAPPDATA%\PC-Setup\AI-Migration`. Fresh **Finish Open WebUI Setup** only finishes imports/configuration and never performs old-stack cleanup.
 
-Safe fixtures exercise the actual bounded orchestration stages with inert helper files: failed import blocks all removal; declined legacy removal blocks OMP removal; successful order is verification, legacy cleanup, then OMP; overlapping active data paths are rejected. Real target GPU inference, native application uninstallers and the complete migration still require the Windows PC.
+The migration does not start or switch text/image model servers; after installation, use the separate model shortcuts.
+
+## Verification boundary
+
+Safe fixtures execute the bounded migration stages with inert helper files and confirm destructive-first order, cancellation blocking later stages, active model/corpus protection, and later setup failure propagation. Separate disposable-directory tests cover deletion of modified old collections/app data with exact-path confirmation while preserving Wikipedia and unrelated siblings. Full native uninstallers, GPU inference and complete device migration still require the Windows PC.
+
+Source path definitions: OMP `packages/utils/src/dirs.ts`; Paseo `server/src/server/paseo-home.ts` and `desktop/src/main.ts`; Strata `discovery.py`/`paths.py`; XeStrata `serve/places.py`. The original setup's `Install-Skills.ps1` defines the three old collection destinations.

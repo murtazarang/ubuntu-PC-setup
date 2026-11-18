@@ -68,7 +68,7 @@ For a PC with the old stack, use the [dedicated existing-PC migration](MIGRATE-A
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/migrate-ai.ps1 | iex
 ```
 
-That separate workflow provisions only replacement AI components, verifies skills/connections/corpus, rejects overlap with protected data, then offers Paseo/Strata/XeStrata and OMP cleanup with explicit confirmation. Declining cleanup is incomplete, not success. It does not run unrelated desktop/driver/Firefox setup. Old skill copies and custom history/settings remain preserved when their safe equivalence cannot be established. See [first-use instructions](OPENWEBUI.md) for the fresh setup path.
+That separate workflow inventories/protects Wikipedia first, then asks for explicit confirmation of irreversible removal of the identified old stack, old skill collections and old-owned history/settings/caches **before installing the replacement**. Edits and custom files inside confirmed old roots are deleted, not compared against the new skills. Unknown/shared locations block cleanup rather than being silently skipped. Only after removal does it install the new AI stack and import/verify the new collections. Wikipedia and unrelated/new-stack data are preserved. There is no rollback if later installation fails. It does not run unrelated desktop/driver/Firefox setup. See [fresh first-use instructions](OPENWEBUI.md) for the separate fresh setup path.
 
 ## GPU and model behavior
 

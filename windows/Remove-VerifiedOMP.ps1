@@ -1,9 +1,9 @@
-# Verified migration cleanup: recognized OMP binary, Bun and npm global installs only.
+# Explicit existing-PC cleanup: official OMP binary and Bun installs only.
 [CmdletBinding()]
-param([switch]$MigrationVerifiedThisRun)
+param([Alias('MigrationVerifiedThisRun')][switch]$CleanupAuthorizedThisRun,[switch]$InventoryOnly)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
-if(-not $MigrationVerifiedThisRun){throw 'Run Finish Open WebUI Setup; successful migration in this run is required.'}
+if(-not $CleanupAuthorizedThisRun){throw 'Run the explicit existing-PC migration cleanup; runtime confirmation is required.'}
 $oldOverride=$env:PI_INSTALL_DIR
 $oldProcessPath=$env:Path
 $package='@oh-my-pi/pi-coding-agent'
@@ -59,6 +59,13 @@ function Assert-NoRunningOMP([string]$Runtime){
         if($process.Name -ieq $Runtime -and -not $process.CommandLine){throw "Cannot identify a running $Runtime process; no package removal attempted."}
     }
 }
+if($InventoryOnly){
+    if($npmInstalled){Assert-NoRunningOMP 'node.exe'}
+    if($bunInstalled){Assert-NoRunningOMP 'bun.exe'}
+    if(@(Get-CimInstance Win32_Process -Filter "Name='omp.exe'").Count){throw 'Close OMP before cleanup; no process was terminated.'}
+    Write-Host 'OMP installation inventory passed; no program was removed.'
+    return
+}
 try {
     if($npmInstalled){
         Assert-NoRunningOMP 'node.exe'
@@ -88,7 +95,7 @@ try {
         $binary=Join-Path $directory 'omp.exe'
         if(Test-Path -LiteralPath $binary -PathType Leaf){
             $env:PI_INSTALL_DIR=$directory
-            & (Join-Path $PSScriptRoot 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun
+            & (Join-Path $PSScriptRoot 'Remove-OMPBinary.ps1') -CleanupAuthorizedThisRun
             if(Test-Path -LiteralPath $binary){throw "OMP program retained; uninstall incomplete: $binary"}
         }
     }
@@ -96,5 +103,5 @@ try {
     $env:Path=([Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+$oldProcessPath)
     $remaining=@(Get-Command omp,omp.exe,omp.cmd,omp.ps1 -All -ErrorAction SilentlyContinue)
     if($remaining.Count){throw ('OMP still resolves after cleanup: '+(($remaining|ForEach-Object {$_.Source}) -join ', '))}
-    Write-Host 'Verified no OMP command remains on current/persisted PATH. Skills, history, settings, Wikipedia and shared Bun remain.'
+    Write-Host 'Verified no OMP command remains on current/persisted PATH. This program-only step did not remove shared Bun or additional user data.'
 } finally {$env:PI_INSTALL_DIR=$oldOverride;$env:Path=$oldProcessPath}
