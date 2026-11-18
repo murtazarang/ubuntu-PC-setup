@@ -36,10 +36,9 @@ foreach ($pathSource in @(
     }
 }
 $env:Path = $pathEntries -join ';'
-& (Join-Path $PSScriptRoot 'Install-OMP.ps1')
 & (Join-Path $PSScriptRoot 'Configure-Desktop.ps1')
-& (Join-Path $PSScriptRoot 'Install-Skills.ps1')
 & (Join-Path $PSScriptRoot 'Configure-Firefox.ps1')
 & (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
-& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware
+& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware -NoShortcut
+& (Join-Path $PSScriptRoot 'Install-OpenWebUI.ps1')
 Write-Host 'Desktop stages finished. Read the Windows README for first-run and verification.'

@@ -59,7 +59,6 @@ cp "$here/assets/colibri/colibri-serve.svg" "$icon_dir/pc-setup-colibri-serve.sv
 python3 "$here/create-colibri-shortcuts.py" --cli "$release/coli" --model "$model" --icon "$icon_dir/pc-setup-colibri-serve.svg" "${extra[@]}"
 echo "Colibri text model ready: $model"
 echo 'Use Colibri Serve to start the local server. This text-only GGUF does not accept images/video.'
-echo "Built-in UI: coli ui --models-dir \"${COLIBRI_MODELS_DIR:-$HOME/colibri-models}\""
 
 # Image checkpoint is native: no conversion or GGUF import.
 image_model="${COLIBRI_MODELS_DIR:-$HOME/colibri-models}/qwen-image-2.1/model"
@@ -74,3 +73,5 @@ cp "$here/assets/colibri/colibri-serve-image.svg" "$icon_dir/pc-setup-colibri-se
 python3 "$here/create-colibri-shortcuts.py" --cli "$release/coli" --python "$venv/bin/python" --model "$image_model" --icon "$icon_dir/pc-setup-colibri-serve-image.svg" --image
 echo 'Colibri Serve Image uses loopback port 8001. Run text and image separately unless memory permits both.'
 echo 'Qwen-Image-2.1 is licensed for research/evaluation; see its downloaded LICENSE.'
+
+systemctl --user daemon-reload

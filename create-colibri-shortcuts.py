@@ -30,38 +30,32 @@ def install(cli, model, icon, dual, home=None, image=False, python=None):
     name = 'Colibri Serve Image' if image else 'Colibri Serve'
     slug = 'pc-setup-colibri-serve-image' if image else 'pc-setup-colibri-serve'
     port = 8001 if image else 8000
-    ui_port = 8791 if image else 8790
     runtime = python or '/usr/bin/python3'
-    # Two upstream commands in a visible terminal, with no saved runtime wrapper.
-    # Port checks never stop an existing service or silently attach to it.
-    startup = """import socket,subprocess,sys,time
-py,cli,model,port,uiport=sys.argv[1:]
-sockets=[]
-try:
- for value in (port,uiport):
-  s=socket.socket();s.bind(('127.0.0.1',int(value)));sockets.append(s)
-except OSError as e:
- raise SystemExit('Colibri port already occupied; close the existing instance first: '+str(e))
-finally:
- for s in sockets:s.close()
-server=subprocess.Popen([py,cli,'serve','--model',model,'--host','127.0.0.1','--port',port])
-time.sleep(1)
-if server.poll() is not None:raise SystemExit('Colibri server exited; see error above.')
-print('Starting the upstream Colibri UI. The model may still be loading.',flush=True)
-ui=subprocess.Popen([py,cli,'ui','--host','127.0.0.1','--port',uiport,'--backend','http://127.0.0.1:'+port])
-while server.poll() is None and ui.poll() is None:time.sleep(1)
-print('A Colibri process exited. This launcher does not kill other processes; use Ctrl+C in this terminal to stop its remaining foreground process group.',flush=True)
-server.wait();ui.wait()
-"""
-    # Keep Exec on one line: Python accepts an escaped source string via exec.
-    inline = 'exec(' + repr(startup) + ')'
-    command = '/usr/bin/env ' + ' '.join(env) + ' ' + ' '.join(quote(x) for x in (runtime, '-c', inline, runtime, cli, model, str(port), str(ui_port)))
-    if image:
-        command = '/usr/bin/env ' + ' '.join(env) + ' ' + ' '.join(quote(x) for x in (runtime, cli, 'web', '--model', model, '--host', '127.0.0.1', '--port', str(port)))
+    # systemd owns only this process group. Stop controls never kill arbitrary ports.
+    service = slug + '.service'
+    unit_dir = Path(os.environ.get('XDG_CONFIG_HOME', str(home / '.config'))) / 'systemd/user'
+    for candidate in (unit_dir, *unit_dir.parents):
+        if candidate.is_symlink(): raise SystemExit('Refusing linked service path: '+str(candidate))
+    unit_dir.mkdir(parents=True, exist_ok=True)
+    unit = unit_dir / service
+    marker = '# ubuntu-pc-setup-colibri'
+    if unit.is_symlink(): raise SystemExit('Refusing linked service file: '+str(unit))
+    if unit.exists() and marker not in unit.read_text():
+        raise SystemExit('Refusing unrelated service: ' + str(unit))
+    def uq(x):
+        return '"' + str(x).replace('\\', '\\\\').replace('"', '\\"').replace('%','%%').replace('$','$$') + '"'
+    command_args = ['/usr/bin/env', *env, runtime, cli, 'serve', '--model', model, '--host', '127.0.0.1', '--port', str(port)]
+    # Starting either model stops the other managed model to release memory.
+    other = 'pc-setup-colibri-serve.service' if image else 'pc-setup-colibri-serve-image.service'
+    content = marker+'\n[Unit]\nDescription='+name+'\nConflicts='+other+('\nAfter='+other if image else '')+'\n[Service]\nType=exec\nExecStart='+' '.join(uq(x) for x in command_args)+'\nKillMode=control-group\nTimeoutStopSec=30\n'
+    if unit.exists() and unit.read_text()!=content: raise SystemExit('Existing managed service was customized; retained: '+str(unit))
+    unit.write_text(content)
+    unit.chmod(0o600)
+    command = '/usr/bin/systemctl --user start ' + service
     text = '\n'.join(['[Desktop Entry]', 'Type=Application', f'Name={name}',
         'Comment=Start the local Colibri model server',
         f'Exec={command}',
-        f'Icon={icon}', 'Terminal=true', 'Categories=Development;',
+        f'Icon={icon}', 'Terminal=false', 'Categories=Development;',
         'X-PC-Setup-Colibri=true', ''])
     applications = Path(os.environ.get('XDG_DATA_HOME', str(home / '.local/share'))) / 'applications'
     write_entry(applications / (slug + '.desktop'), text)
@@ -73,6 +67,9 @@ server.wait();ui.wait()
     except (OSError, subprocess.CalledProcessError, ValueError):
         desktop = home / 'Desktop'
     write_entry(desktop / (name + '.desktop'), text)
+    stop_text = text.replace('Name='+name, 'Name=Stop '+name).replace('--user start ', '--user stop ')
+    write_entry(applications / (slug + '-stop.desktop'), stop_text)
+    write_entry(desktop / ('Stop ' + name + '.desktop'), stop_text)
     print('Serve shortcut installed:', desktop / (name + '.desktop'))
     print('GNOME may ask you to right-click the desktop icon and choose Allow Launching once.')
 

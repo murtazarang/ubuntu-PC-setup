@@ -19,7 +19,7 @@ if command -v nvidia-smi >/dev/null; then
  check_nvidia_license() { local license; license=$(modinfo -F license nvidia) || return 1; echo "$license"; [[ $license == NVIDIA ]]; }
  check 'NVIDIA proprietary kernel module' check_nvidia_license
 fi
-for c in steam omp uv; do check "$c on PATH" command -v "$c"; done
+for c in steam uv; do check "$c on PATH" command -v "$c"; done
 for app in spotify code mailspring; do check "Snap: $app" snap list "$app"; done
 check 'Colibri launcher' command -v coli
 if command -v flatpak >/dev/null && flatpak info --user com.stremio.Stremio >/dev/null 2>&1; then
@@ -31,7 +31,7 @@ enabled=$(gnome-extensions list --enabled 2>/dev/null || true)
 for extension in caffeine@patapon.info clipboard-history@alexsaveau.dev lightning-gnome-launcher@avimanyu; do
  if grep -Fxq "$extension" <<<"$enabled"; then echo "Enabled: $extension"; else echo "Not enabled: $extension (try logging out/in)"; fail=1; fi
 done
-check 'Oh My Pi skills' omp skill list --json
+check 'Open WebUI service registered' systemctl --user cat pc-setup-openwebui.service
 endpoint=''
 for port in 8000; do
  if curl -fsS --max-time 3 "http://127.0.0.1:$port/v1/models" >/dev/null; then endpoint="http://127.0.0.1:$port/v1"; break; fi

@@ -51,14 +51,12 @@ class LocalModelConnectionTests(unittest.TestCase):
       env=os.environ|{'HOME':td,'no_proxy':'127.0.0.1,localhost','NO_PROXY':'127.0.0.1,localhost'}
       r=subprocess.run(['bash',str(ROOT/'connect-colibri.sh'),'8000'],env=env,text=True,capture_output=True)
       self.assertEqual(r.returncode,0,r.stderr)
-      content=(home/'.omp/agent/models.yml').read_text(); self.assertIn('old-provider',content); self.assertIn('http://127.0.0.1:8000/v1',content); self.assertIn('example-local',content)
-      calls=(home/'calls').read_text(); self.assertIn('modelRoles',calls); self.assertNotIn('enabledModels',calls); self.assertIn('pc-setup-colibri/example-local',calls); self.assertIn('global/review',calls)
-      import yaml
-      config=home/'.omp/agent/models.yml'
-      data=yaml.safe_load(config.read_text()); data['providers']['pc-setup-colibri']['models'][0]['maxTokens']=123
-      config.write_text(yaml.safe_dump(data)); before=config.read_text()
+      content=(home/'.omp/agent/models.yml').read_text()
+      self.assertEqual(content,'providers:\n  old-provider:\n    baseUrl: http://example.invalid\n')
+      self.assertIn('example-local',r.stdout);self.assertIn('http://127.0.0.1:8000/v1',r.stdout)
+      self.assertFalse((home/'calls').exists(),'No OMP command should be invoked')
       rerun=subprocess.run(['bash',str(ROOT/'connect-colibri.sh')],env=env,text=True,capture_output=True)
-      self.assertNotEqual(rerun.returncode,0); self.assertEqual(config.read_text(),before)
+      self.assertEqual(rerun.returncode,0);self.assertEqual((home/'.omp/agent/models.yml').read_text(),content)
     finally:
      server.shutdown(); server.server_close(); thread.join()
 

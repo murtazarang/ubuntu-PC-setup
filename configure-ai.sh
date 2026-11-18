@@ -5,7 +5,7 @@ if (( EUID == 0 )); then echo 'Run as the desktop user.' >&2; exit 1; fi
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 for c in curl python3 tar sha256sum; do command -v "$c" >/dev/null || { echo "Missing $c; run install-apps.sh first." >&2; exit 1; }; done
-"$here/configure-skills.sh"
+
 version=v2.1.0
 base="${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-colibri"
 release="$base/$version"

@@ -5,6 +5,8 @@ on:
       - 'windows/**'
       - '*.sh'
       - 'create-colibri-shortcuts.py'
+      - 'create-openwebui-services.py'
+      - 'openwebui_*.py'
       - 'scripts/**'
       - 'tests/**'
       - 'assets/colibri/**'
@@ -115,6 +117,15 @@ jobs:
       - name: Paseo registered uninstall arguments (PowerShell 7)
         shell: pwsh
         run: ./windows/test-paseo-uninstall.ps1
+      - name: Open WebUI migration fixtures (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/test-openwebui-migration.ps1
+      - name: Open WebUI migration fixtures (PowerShell 7)
+        shell: pwsh
+        run: ./windows/test-openwebui-migration.ps1
+      - name: Open WebUI lifecycle safe fixtures
+        shell: pwsh
+        run: uv run --no-project --with psutil==7.2.2 python windows/test_openwebui_desktop.py
       - name: Colibri native Serve shortcut (Windows PowerShell 5.1)
         shell: powershell
         run: ./windows/tests/test-colibri-serve-shortcut.ps1
@@ -143,3 +154,28 @@ jobs:
           command -v gio
           command -v cc
           python3 -m unittest discover -s tests -v
+
+  openwebui-protocol-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install disposable protocol-test environments (CPU only; not user deployment)
+        run: |
+          uv venv --python 3.11 "$RUNNER_TEMP/webui"
+          uv pip install --python "$RUNNER_TEMP/webui/bin/python" --torch-backend cpu 'open-webui==0.13.4' 'torch==2.9.1'
+          uv venv --python 3.12 "$RUNNER_TEMP/mcpo"
+          uv pip install --python "$RUNNER_TEMP/mcpo/bin/python" 'mcpo==0.0.20' 'mcp==1.30.0' 'fastapi==0.115.12'
+          uv venv --python 3.12 "$RUNNER_TEMP/zim"
+          uv pip install --python "$RUNNER_TEMP/zim/bin/python" 'openzim-mcp==3.4.0'
+      - name: Fetch and verify official small Wikipedia test archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/zim-fixture"
+          curl --fail --location --retry 3 --max-time 180 'https://raw.githubusercontent.com/openzim/zim-testing-suite/main/data/withns/wikipedia_en_climate_change_mini_2024-06.zim' -o "$RUNNER_TEMP/zim-fixture/climate.zim"
+          echo "72db7ae7708d3a4cff918495078901ec027b14b427433a2328286ec130d1c43b  $RUNNER_TEMP/zim-fixture/climate.zim" | sha256sum --check
+      - name: Prepare all three complete audited skill repositories
+        run: python3 openwebui_skills.py prepare --root "$RUNNER_TEMP/skill-repos"
+      - name: Real WebUI skills and Wikipedia roundtrip with simulated inference
+        run: |
+          python3 tests/openwebui_runtime_smoke.py --webui-exe "$RUNNER_TEMP/webui/bin/open-webui" --mcpo-exe "$RUNNER_TEMP/mcpo/bin/mcpo" --openzim-exe "$RUNNER_TEMP/zim/bin/openzim-mcp" --archive-dir "$RUNNER_TEMP/zim-fixture" --skills-root "$RUNNER_TEMP/skill-repos"

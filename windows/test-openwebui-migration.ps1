@@ -1,0 +1,61 @@
+# Safe actual entrypoint fixtures: disposable fake OMP files, never real programs.
+$ErrorActionPreference='Stop'
+$source=$PSScriptRoot
+$temp=Join-Path ([IO.Path]::GetTempPath()) ('webui-migration-test-'+[guid]::NewGuid())
+New-Item -ItemType Directory $temp|Out-Null
+$oldDirectory=$env:PI_INSTALL_DIR
+$oldPath=[Environment]::GetEnvironmentVariable('Path','User')
+function global:Get-CimInstance { param($ClassName,$Filter) return @() }
+function global:Read-Host { param($Prompt) return $script:answer }
+try {
+    $env:PI_INSTALL_DIR=Join-Path $temp 'omp'
+    New-Item -ItemType Directory $env:PI_INSTALL_DIR|Out-Null
+    $exe=Join-Path $env:PI_INSTALL_DIR 'omp.exe'
+    Set-Content -LiteralPath $exe -Value 'test only; not executable'
+    $keep=Join-Path $env:PI_INSTALL_DIR 'custom-skill.txt'
+    Set-Content -LiteralPath $keep -Value 'must survive'
+    $script:answer=''
+    & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
+    if(-not(Test-Path $exe)){throw 'Decline incorrectly removed OMP'}
+    $rejected=$false
+    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') } catch {$rejected=$true}
+    if(-not $rejected){throw 'Missing verification gate was accepted'}
+    [Environment]::SetEnvironmentVariable('Path',($oldPath+';'+$env:PI_INSTALL_DIR+';'+$env:PI_INSTALL_DIR+'-unrelated'),'User')
+    $script:answer='DELETE'
+    & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
+    if(Test-Path $exe){throw 'Confirmed fake OMP file not removed'}
+    if(-not(Test-Path $keep)){throw 'Unrelated file removed'}
+    $after=[Environment]::GetEnvironmentVariable('Path','User') -split ';'
+    if($env:PI_INSTALL_DIR -in $after){throw 'Exact PATH entry retained'}
+    if(($env:PI_INSTALL_DIR+'-unrelated') -notin $after){throw 'Unrelated PATH entry removed'}
+    # Junction path is deliberately rejected even with confirmation.
+    $linked=Join-Path $temp 'linked'
+    New-Item -ItemType Junction -Path $linked -Target $env:PI_INSTALL_DIR|Out-Null
+    Set-Content -LiteralPath $exe -Value 'fake'
+    $env:PI_INSTALL_DIR=$linked
+    $rejected=$false
+    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
+    if(-not $rejected -or -not(Test-Path $exe)){throw 'Linked target guard failed'}
+    # Finish runs a real Python fixture, not an actual import/network operation.
+    $root=Join-Path $temp 'webui'
+    & python -m venv (Join-Path $root 'venv')
+    if($LASTEXITCODE -ne 0){throw 'Python fixture creation failed'}
+    $helper=Join-Path $root 'openwebui_skills.py'
+    $cleanup=Join-Path $root 'Remove-VerifiedOMP.ps1'
+    Set-Content -LiteralPath $cleanup -Value "Set-Content -LiteralPath (Join-Path `$PSScriptRoot 'cleaned') -Value yes"
+    Set-Content -LiteralPath $helper -Value 'import sys; sys.exit(1)'
+    & (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
+    if(Test-Path (Join-Path $root 'cleaned')){throw 'Failed import triggered cleanup'}
+    Set-Content -LiteralPath $helper -Value "import sys; assert '--reference-manifest' in sys.argv; assert '--wiki-key-file' in sys.argv"
+    & (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root
+    if(-not(Test-Path (Join-Path $root 'cleaned'))){throw 'Successful verified fixture did not reach cleanup'}
+    Write-Host 'PASS: decline/gate/exact path/preserved files/junction/import failure/manifest arguments.'
+} finally {
+    [Environment]::SetEnvironmentVariable('Path',$oldPath,'User')
+    $env:PI_INSTALL_DIR=$oldDirectory
+    Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue
+    Remove-Item Function:\Read-Host -ErrorAction SilentlyContinue
+    # Remove junction itself first; avoid traversing it during recursive fixture cleanup.
+    if(Test-Path (Join-Path $temp 'linked')){[IO.Directory]::Delete((Join-Path $temp 'linked'))}
+    Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+}

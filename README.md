@@ -35,17 +35,17 @@ Run in a **logged-in GNOME desktop session**:
 ./setup.sh desktop
 ```
 
-This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs Colibri's built-in browser UI. It no longer installs Paseo, Strata or XeStrata. Setup downloads a checksum-verified text GGUF, resuming interrupted transfers and reusing verified local files. OMP's other providers remain available.
+This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs native Open WebUI connected to Colibri. It no longer installs OMP, Paseo, Strata or XeStrata. Setup downloads a checksum-verified text GGUF, resuming interrupted transfers and reusing verified local files.
 
 ### Offline educational reference
 
-The desktop stage registers the complete Education Agent Skills portable release alongside the two existing skill collections, and installs a local Kiwix MCP bridge for Oh My Pi. The desktop stage also downloads the Wikipedia archive (about 49 GiB). To retry or resume that download separately, run:
+The desktop stage prepares all three complete skill collections for Open WebUI and installs OpenZIM through its official mcpo bridge. Complete the authenticated first-use import after creating your local WebUI account. See [native Open WebUI setup](docs/openwebui-linux.md). The desktop stage also downloads the Wikipedia archive (about 49 GiB). To retry or resume that download separately, run:
 
 ```bash
 ./download-wikipedia.sh
 ```
 
-This downloads the English full-text June 2026 Wikipedia snapshot without pictures to `~/.local/share/kiwix-mcp/archives`. An interrupted download can be resumed. To use a different location, set `KIWIX_ARCHIVE_DIR` to the same directory when running both `./configure-kiwix.sh` and `./download-wikipedia.sh`. Restart Oh My Pi after configuration. Ask it to search the Kiwix archive and cite the article. The archive is a dated snapshot and source lookup does not guarantee that a model's answer is correct. Textbook PDF search is not included. No cloud account is needed for the bridge.
+This downloads the English full-text June 2026 Wikipedia snapshot without pictures to `~/.local/share/kiwix-mcp/archives`. An interrupted download can be resumed. To use a different location, set `KIWIX_ARCHIVE_DIR` to the same directory when running both `./configure-kiwix.sh` and `./download-wikipedia.sh`. Use the Wikipedia tool in Open WebUI to search the archive and cite the article. The archive is a dated snapshot and source lookup does not guarantee that a model's answer is correct. Textbook PDF search is not included. No cloud account is needed for the bridge.
 
 
 ### Colibri on the three Ubuntu PCs
@@ -60,7 +60,7 @@ Setup selects Qwen3.8-27B UD-Q4_K_M text GGUF for the RTX 3080 and Arc B580, and
 
 Run `./configure-ai.sh NvidiaSingle`, `NvidiaDual`, or `Intel` to select explicitly; default detection recognizes the three requested PCs and otherwise stops with instructions. `COLIBRI_MODELS_DIR` can set another model root. Launch **Colibri Serve** from the desktop/app menu. GNOME may require **Allow Launching** once. It starts native `coli serve` and the modern `coli ui` (port 8790, backend 8000) together in a visible terminal. Keep it open; Ctrl+C stops the foreground process group. Existing occupied server/UI ports are not reused or killed. The shortcut applies Vulkan and the dual-GPU expert-tier flag only for NvidiaDual. No autostart or custom model-running service is installed.
 
-The built-in UI remains available with `coli ui --models-dir "$HOME/colibri-models"` at `http://127.0.0.1:8790`; inference is loopback `http://127.0.0.1:8000/v1`. Run `./connect-colibri.sh` after the server starts to update OMP. The installed text GGUFs do **not** support image/video inputs. Model Downloads/Use in the upstream UI remain available; Linux Use switches an already-running gateway. Rerun the OMP connection helper after changing models.
+Use the **Colibri Serve** and **Colibri Serve Image** desktop shortcuts to start a model, and their **Stop** shortcuts to release its memory. Starting one stops only the other setup-managed model. **Open WebUI** starts the UI and Wikipedia bridge, then opens the browser. Text inference uses localhost:8000; images use localhost:8001. The text GGUFs do not accept images/video. Supporting-model GPU setup is currently enabled for NVIDIA with CUDA; Intel awaits an explicit supported backend choice, with no silent CPU fallback.
 
 Setup also downloads the native Qwen-Image-2.1 checkpoint (about 33 GB) with the same resume/hash/reuse checks, and creates **Colibri Serve Image** with a **Serve Img** icon label. It invokes upstream `coli web` directly on loopback port **8001**, using isolated Python with NumPy and Pillow. Text Serve uses **8000**. Run one at a time unless memory permits both; separate ports do not guarantee enough combined GPU/RAM capacity. Image generation is distinct from the text model's input capabilities. The image checkpoint's license limits use to research/evaluation; read its downloaded LICENSE before use. The image shortcut opens the upstream image-generation web frontend automatically. The modern `coli ui` does not implement image generation, so it is used only for text. No third desktop UI shortcut is created.
 
@@ -97,7 +97,7 @@ It creates one partition and mounts it at `/mnt/storage` using a UUID. The choic
 python3 -m unittest discover -s tests -v
 ```
 
-Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, OMP's ability to call a local tool, and the Colibri UI on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
+Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, Open WebUI's ability to search Wikipedia, imported skill completeness, and the image/text models on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
 
 ## Sources and verification
 
@@ -105,5 +105,5 @@ Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a 
 - [Ubuntu NVIDIA drivers](https://ubuntu.com/server/docs/nvidia-drivers-installation/)
 - [Timeshift](https://github.com/linuxmint/timeshift)
 - [Colibri UI](https://github.com/JustVugg/colibri/blob/v2.1.0/ui/README.md), [Vulkan/dual-device backend](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/vulkan.md)
-- [Oh My Pi skills](https://github.com/can1357/oh-my-pi/blob/main/docs/skills.md)
+- [Open WebUI installation](https://docs.openwebui.com/getting-started/quick-start/), [skills](https://docs.openwebui.com/features/workspace/skills/)
 - [Firefox policies](https://firefox-admin-docs.mozilla.org/reference/policies/extensionsettings/), [uBlock managed configuration](https://github.com/gorhill/uBlock/wiki/Deploying-uBlock-Origin:-configuration)

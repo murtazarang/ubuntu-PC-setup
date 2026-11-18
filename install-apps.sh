@@ -36,7 +36,6 @@ sudo snap install mailspring || { snap list mailspring >/dev/null 2>&1 || exit 1
 if snap list thunderbird >/dev/null 2>&1; then sudo snap remove thunderbird; fi
 if dpkg-query -W -f='${db:Status-Status}' thunderbird 2>/dev/null | grep -qx installed; then sudo apt-get remove -y thunderbird; fi
 
-# Install official uv and Oh My Pi as the current desktop user.
+# Install official uv as the current desktop user.
 if ! command -v uv >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
-if ! command -v omp >/dev/null; then curl -fsSL https://omp.sh/install | sh; fi
 printf '%s\n' 'Applications installed. Sign in to your online services yourself. Run the desktop and AI setup stages next.'

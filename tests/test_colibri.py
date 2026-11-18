@@ -25,7 +25,7 @@ class ColibriInstallTests(unittest.TestCase):
    sums=p/'sums';sums.write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+'  colibri-v2.1.0-linux-x86_64.tar.gz\n')
    curl=bin/'curl';curl.write_text('#!/bin/bash\ncase "$4" in *SHA256SUMS*) cp "$SUMS" "$6";; *) cp "$ARCHIVE" "$6";; esac\n');curl.chmod(0o755)
    # Arguments are -fL --retry 3 URL -o PATH.
-   env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(home/'data'),'PATH':str(bin)+':'+os.environ['PATH'],'SUMS':str(sums),'ARCHIVE':str(archive)}
+   env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(home/'data'),'XDG_CONFIG_HOME':str(home/'.config'),'PATH':str(bin)+':'+os.environ['PATH'],'SUMS':str(sums),'ARCHIVE':str(archive)}
    for _ in range(2):
     r=subprocess.run(['bash',str(src/'configure-ai.sh')],env=env,capture_output=True,text=True)
     self.assertEqual(r.returncode,0,r.stdout+r.stderr)
@@ -39,11 +39,12 @@ class DesktopShortcutTests(unittest.TestCase):
   m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
   with tempfile.TemporaryDirectory() as td:
    home=pathlib.Path(td)
-   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(home/'data')}), unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
+   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(home/'data'),'XDG_CONFIG_HOME':str(home/'.config')}), unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
     m.install('/some path/coli','/models/model 27B','/icons/serve.svg',True,home)
     desktop=home/'Desktop/Colibri Serve.desktop'; text=desktop.read_text()
-    self.assertIn('COLI_VK_DEV2=auto',text); self.assertIn("'serve'",text); self.assertIn('/models/model 27B',text); self.assertIn("'ui'",text)
-    self.assertIn('Terminal=true',text);self.assertNotIn('sh -c',text)
+    unit=(home/'.config/systemd/user/pc-setup-colibri-serve.service').read_text()
+    self.assertIn('COLI_VK_DEV2=auto',unit); self.assertIn('\"serve\"',unit); self.assertIn('/models/model 27B',unit); self.assertNotIn('\"ui\"',unit)
+    self.assertIn('Terminal=false',text);self.assertNotIn('sh -c',text)
     desktop.write_text('user customization')
     with self.assertRaises(SystemExit): m.install('/coli','/model','/icon',False,home)
     self.assertEqual(desktop.read_text(),'user customization')
@@ -59,11 +60,11 @@ class ModelSetupTests(unittest.TestCase):
    (src/'assets/colibri/colibri-serve.svg').write_text('<svg/>')
    (src/'assets/colibri/colibri-serve-image.svg').write_text('<svg/>')
    venv=home/'data/pc-setup-colibri/image-python/bin';venv.mkdir(parents=True);(venv/'python').write_text('#!/bin/sh\nexit 0\n');(venv/'python').chmod(0o755)
-   bin=p/'bin';bin.mkdir();uv=bin/'uv';uv.write_text('#!/bin/sh\nexit 0\n');uv.chmod(0o755)
+   bin=p/'bin';bin.mkdir();ctl=bin/'systemctl';ctl.write_text('#!/bin/sh\nexit 0\n');ctl.chmod(0o755);uv=bin/'uv';uv.write_text('#!/bin/sh\nexit 0\n');uv.chmod(0o755)
    (src/'colibri-models.json').write_text(json.dumps({'dense27b':{'format':'gguf','first_shard':'weights.gguf'}}))
    (src/'download_colibri_model.py').write_text("import pathlib,sys;p=pathlib.Path(sys.argv[sys.argv.index('--destination')+1]);p.mkdir(parents=True,exist_ok=True);(p/'weights.gguf').write_text('fixture')")
    (release/'coli').write_text("import pathlib,sys,json;assert sys.argv[1]=='import';assert '--no-mtp' in sys.argv;assert sys.argv[-2:] == ['link','--no-mtp'];p=pathlib.Path(sys.argv[sys.argv.index('--out')+1]);[(p/f).write_text('{}') for f in ('config.json','tokenizer.json','gguf.json')]")
-   env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(home/'data'),'PATH':str(bin)+':'+os.environ['PATH']}
+   env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(home/'data'),'XDG_CONFIG_HOME':str(home/'.config'),'PATH':str(bin)+':'+os.environ['PATH']}
    command=['bash',str(src/'configure-colibri-model.sh'),str(release),'NvidiaSingle']
    for _ in range(2):
     r=subprocess.run(command,env=env,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
@@ -77,30 +78,14 @@ class ImageShortcutTests(unittest.TestCase):
   m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
   with tempfile.TemporaryDirectory() as td:
    home=pathlib.Path(td)
-   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(home/'data')}), unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
+   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(home/'data'),'XDG_CONFIG_HOME':str(home/'.config')}), unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
     m.install('/coli','/image','/image.svg',True,home,image=True)
-    text=(home/'Desktop/Colibri Serve Image.desktop').read_text()
-    self.assertIn('\"8001\"',text);self.assertIn('\"web\"',text);self.assertNotIn('COLI_VK_DEV2=auto',text)
-    self.assertIn('-u COLI_VK_DEV2',text)
+    text=(home/'.config/systemd/user/pc-setup-colibri-serve-image.service').read_text()
+    self.assertIn('\"8001\"',text);self.assertIn('\"serve\"',text);self.assertNotIn('COLI_VK_DEV2=auto',text)
+    self.assertIn('\"-u\" \"COLI_VK_DEV2\"',text)
 
-class NativeUILaunchTests(unittest.TestCase):
- def test_inline_starts_native_serve_then_ui(self):
-  import ast,sys,socket
-  tree=ast.parse((ROOT/'create-colibri-shortcuts.py').read_text())
-  startup=next(n.value.value for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='startup' for t in n.targets))
-  with tempfile.TemporaryDirectory() as td:
-   p=pathlib.Path(td);cli=p/'coli';calls=p/'calls'
-   cli.write_text("import sys,time,json,pathlib\np=pathlib.Path("+repr(str(calls))+");f=p.open('a');f.write(json.dumps(sys.argv[1:])+'\\n');f.close();time.sleep(2 if sys.argv[1]=='serve' else 0.1)")
-   sockets=[]
-   for _ in range(2):
-    s=socket.socket();s.bind(('127.0.0.1',0));sockets.append(s)
-   ports=[str(s.getsockname()[1]) for s in sockets]
-   for s in sockets:s.close()
-   r=subprocess.run([sys.executable,'-c',startup,sys.executable,str(cli),str(p/'model'),*ports],capture_output=True,text=True,timeout=10)
-   self.assertEqual(r.returncode,0,r.stderr)
-   commands=[json.loads(x) for x in calls.read_text().splitlines()]
-   self.assertEqual([c[0] for c in commands],['serve','ui']);self.assertIn('http://127.0.0.1:'+ports[0],commands[1])
-
+# Native UI launch tests are superseded by systemd lifecycle tests in
+# test_openwebui_linux.py: Colibri UI is intentionally no longer launched.
 class DesktopGioTests(unittest.TestCase):
  def test_gio_launch_preserves_special_arguments(self):
   import importlib.util, shutil,sys,time
@@ -118,30 +103,17 @@ class DesktopGioTests(unittest.TestCase):
     if out.exists():break
     time.sleep(.02)
    self.assertTrue(out.exists(),r.stderr);self.assertEqual(json.loads(out.read_text()),values)
- def test_generated_text_entry_executes_both_native_commands(self):
-  import importlib.util,shutil,sys,time,unittest.mock,socket
-  if not shutil.which('gio'): self.skipTest('GIO is unavailable')
-  for port in (8000,8790):
-   s=socket.socket()
-   try:s.bind(('127.0.0.1',port))
-   except OSError:self.skipTest('Fixture port occupied')
-   finally:s.close()
+ def test_generated_entry_invokes_only_owned_service(self):
+  import importlib.util,unittest.mock
   spec=importlib.util.spec_from_file_location('shortcuts',ROOT/'create-colibri-shortcuts.py')
   m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
   with tempfile.TemporaryDirectory() as td:
-   p=pathlib.Path(td);cli=p/'coli $quoted';calls=p/'calls'
-   cli.write_text("import json,pathlib,sys,time\np=pathlib.Path("+repr(str(calls))+");f=p.open('a');f.write(json.dumps(sys.argv[1:])+'\\n');f.close();time.sleep(2 if sys.argv[1]=='serve' else 0.1)")
-   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(p/'data')}),unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
-    m.install(str(cli),str(p/'model $x'),'/icon.svg',False,p,python=sys.executable)
-   desktop=p/'Desktop/Colibri Serve.desktop'
-   desktop.write_text(desktop.read_text().replace('Terminal=true','Terminal=false'))
-   r=subprocess.run(['gio','launch',str(desktop)],capture_output=True,text=True,timeout=10)
-   self.assertEqual(r.returncode,0,r.stderr)
-   for _ in range(200):
-    if calls.exists() and len(calls.read_text().splitlines())==2:break
-    time.sleep(.02)
-   commands=[json.loads(x) for x in calls.read_text().splitlines()]
-   self.assertEqual([c[0] for c in commands],['serve','ui']);self.assertIn(str(p/'model $x'),commands[0])
+   p=pathlib.Path(td)
+   with unittest.mock.patch.dict(os.environ,{'XDG_DATA_HOME':str(p/'data'),'XDG_CONFIG_HOME':str(p/'config')}),unittest.mock.patch.object(m.subprocess,'run',side_effect=FileNotFoundError):
+    m.install('/cli','/model','/icon',False,p)
+   text=(p/'Desktop/Colibri Serve.desktop').read_text()
+   self.assertIn('Exec=/usr/bin/systemctl --user start pc-setup-colibri-serve.service',text)
+   self.assertNotIn('kill',text)
 
 class DirectCleanupTests(unittest.TestCase):
  def run_cleanup(self,home,answer='DELETE LEGACY AI\n',systemctl=None):

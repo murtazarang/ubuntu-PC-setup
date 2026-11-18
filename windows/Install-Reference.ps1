@@ -6,8 +6,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $uv = (Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
-$uvx = (Get-Command uvx.exe -CommandType Application -ErrorAction Stop).Source
-$omp = (Get-Command omp.exe -CommandType Application -ErrorAction Stop).Source
 New-Item -ItemType Directory -Force -Path $ArchiveDirectory | Out-Null
 
 # A dedicated durable tool environment avoids evictable uvx cache and does not
@@ -28,9 +26,6 @@ try {
     $env:UV_TOOL_DIR = $oldToolDir
     $env:UV_TOOL_BIN_DIR = $oldToolBinDir
 }
-Write-Host 'Locating Oh My Pi configuration directory.'
-$agentDir = (& $omp config path | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to find OMP configuration directory.' }
 $name = 'wikipedia_en_all_nopic_2026-06.zim'
 $final = Join-Path $ArchiveDirectory $name
 $part = "$final.part"
@@ -69,8 +64,6 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     }
     Write-Host "Verified existing archive $final"
 }
-& $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --bridge $bridge --legacy-uvx $uvx --zim-dir $ArchiveDirectory
-if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP.' }
-
-Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP."
-
+$reference = Join-Path $env:LOCALAPPDATA 'OpenZIM\reference.json'
+@{bridge=$bridge;archive_directory=$ArchiveDirectory;archive=$final;sha256=$expectedHash}|ConvertTo-Json|Set-Content -LiteralPath $reference -Encoding utf8
+Write-Host "Verified offline Wikipedia. Open WebUI will use the local OpenZIM bridge: $final"
