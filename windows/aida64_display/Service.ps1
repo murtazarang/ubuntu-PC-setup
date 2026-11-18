@@ -225,8 +225,8 @@ $oldCacheDir = $env:UV_CACHE_DIR
 try {
     $env:UV_PYTHON_INSTALL_DIR = Join-Path $release 'python'
     $env:UV_CACHE_DIR = Join-Path $release 'uv-cache'
-    Invoke-CheckedNative $uv.Source @('--no-config','python','install','3.11')
-    $basePython = @(& $uv.Source --no-config python find --managed-python 3.11)
+    Invoke-CheckedNative $uv.Source @('--no-config','python','install','--no-bin','--no-registry','3.11')
+    $basePython = @(& $uv.Source --no-config python find --no-project --system --managed-python 3.11)
     if ($LASTEXITCODE -ne 0 -or $basePython.Count -ne 1 -or -not $basePython[0].StartsWith($release + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Managed Python was not resolved inside protected service runtime.' }
     Invoke-CheckedNative $uv.Source @('--no-config','venv','--copies','--python',$basePython[0],(Join-Path $release '.venv'))
     $python = Join-Path $release '.venv\Scripts\python.exe'
@@ -256,6 +256,14 @@ foreach ($item in @(Get-Item -LiteralPath $release) + @(Get-ChildItem -LiteralPa
     Set-Acl -LiteralPath $item.FullName -AclObject $acl
 }
 $binPath = '"'  + $python + '" -E -s "' + (Join-Path $release 'service_host.py') + '"'
+# Recheck ownership after downloads/builds, before changing live startup.
+$latestService = Get-OwnedService $root
+if (($null -eq $existing) -ne ($null -eq $latestService) -or
+    ($existing -and $latestService.PathName -ne $existing.PathName)) {
+    throw 'AX206 service changed during setup; staged files retained and startup left alone.'
+}
+$existing = $latestService
+$task = Get-OldTask $identity.User.Value $LegacyInstallDir
 Invoke-StartupMigration
 Write-Host 'AX206 Windows service is running and configured to start at boot, before sign-in.'
 Write-Host "Logs: $logs\service.log"
