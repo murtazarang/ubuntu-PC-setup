@@ -33,6 +33,8 @@ try {
     Set-Content $driver ('$ErrorActionPreference="Stop";$root=$env:TEST_AI_ROOT;$Hardware="NvidiaSingle";$ArchiveDirectory="C:\fixture";$reference=Join-Path $env:LOCALAPPDATA "reference.json"'+[Environment]::NewLine+$block)
     foreach($case in @('import-fails','legacy-declines','success','linked-weights')){
         $env:TEST_AI_LOG=Join-Path $temp ($case+'.log')
+        # A correct protection preflight can reject the run before any stage emits an event.
+        [IO.File]::WriteAllText($env:TEST_AI_LOG,'')
         $env:TEST_LEGACY_ROOT=''
         Set-Content (Join-Path $root 'desktop.json') '{"text_model":"C:\\fixture-models\\text","image_model":"C:\\fixture-models\\image"}'
         if($case -eq 'linked-weights'){
