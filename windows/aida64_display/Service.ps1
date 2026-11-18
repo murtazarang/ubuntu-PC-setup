@@ -97,6 +97,26 @@ function Read-ServiceConfig {
     Assert-ProtectedDirectory $full
     return $value
 }
+function Initialize-ServiceRuntime {
+    param([string]$Release,[string]$Source,[string]$UvExe)
+$oldPythonDir = $env:UV_PYTHON_INSTALL_DIR
+$oldCacheDir = $env:UV_CACHE_DIR
+try {
+    $env:UV_PYTHON_INSTALL_DIR = Join-Path $release 'python'
+    $env:UV_CACHE_DIR = Join-Path $release 'uv-cache'
+    Invoke-CheckedNative $UvExe @('--no-config','python','install','--no-bin','--no-registry','3.11')
+    $basePython = @(& $UvExe --no-config python find --no-project --system --managed-python 3.11)
+    if ($LASTEXITCODE -ne 0 -or $basePython.Count -ne 1 -or -not $basePython[0].StartsWith($release + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Managed Python was not resolved inside protected service runtime.' }
+    Invoke-CheckedNative $basePython[0] @('-E','-s','-m','venv','--copies','--without-pip',(Join-Path $release '.venv'))
+    $python = Join-Path $release '.venv\Scripts\python.exe'
+    Invoke-CheckedNative $python @('-E','-s','-c','import pathlib,sys; root=pathlib.Path(sys.argv[1]).resolve(); assert pathlib.Path(sys.base_prefix).resolve().is_relative_to(root); assert pathlib.Path(sys.prefix).resolve().is_relative_to(root)', $release)
+    Invoke-CheckedNative $UvExe @('--no-config','pip','install','--python',$python,$source,'pywin32')
+    Invoke-CheckedNative $python @('-E','-s',(Join-Path $source 'tools\fetch_lhm.py'))
+} finally {
+    $env:UV_PYTHON_INSTALL_DIR = $oldPythonDir
+    $env:UV_CACHE_DIR = $oldCacheDir
+}
+}
 function Invoke-StartupMigration {
 $oldTaskXml = $null
 $taskWasRunning = $false
@@ -220,22 +240,8 @@ Expand-Archive -LiteralPath $archive -DestinationPath $release
 Move-Item -LiteralPath (Join-Path $release "win-ax206-display-$commit") -Destination (Join-Path $release 'source')
 Remove-Item -LiteralPath $archive
 $source = Join-Path $release 'source'
-$oldPythonDir = $env:UV_PYTHON_INSTALL_DIR
-$oldCacheDir = $env:UV_CACHE_DIR
-try {
-    $env:UV_PYTHON_INSTALL_DIR = Join-Path $release 'python'
-    $env:UV_CACHE_DIR = Join-Path $release 'uv-cache'
-    Invoke-CheckedNative $uv.Source @('--no-config','python','install','--no-bin','--no-registry','3.11')
-    $basePython = @(& $uv.Source --no-config python find --no-project --system --managed-python 3.11)
-    if ($LASTEXITCODE -ne 0 -or $basePython.Count -ne 1 -or -not $basePython[0].StartsWith($release + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Managed Python was not resolved inside protected service runtime.' }
-    Invoke-CheckedNative $uv.Source @('--no-config','venv','--copies','--python',$basePython[0],(Join-Path $release '.venv'))
-    $python = Join-Path $release '.venv\Scripts\python.exe'
-    Invoke-CheckedNative $uv.Source @('--no-config','pip','install','--python',$python,$source,'pywin32')
-    Invoke-CheckedNative $python @((Join-Path $source 'tools\fetch_lhm.py'))
-} finally {
-    $env:UV_PYTHON_INSTALL_DIR = $oldPythonDir
-    $env:UV_CACHE_DIR = $oldCacheDir
-}
+Initialize-ServiceRuntime -Release $release -Source $source -UvExe $uv.Source
+$python = Join-Path $release '.venv\Scripts\python.exe'
 foreach ($name in @('service_host.py','safe_theme.py','panel.py','lifecycle.py','usb_transport.py','Run.ps1','Service.ps1','LICENSE')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $release
 }

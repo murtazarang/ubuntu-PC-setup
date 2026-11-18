@@ -60,7 +60,7 @@ To remove startup while preserving files/settings/logs:
 
 ## Validation
 
-Python tests cover simulated reconnects, bounded USB transfers, rotation, SCM callback mapping and shutdown state. Windows CI executes safe PowerShell guard/delegation tests and the Windows mutex test; no installer, real service registration, GPU sensors or USB hardware is exercised by CI. Physical boot, sleep/resume and sensor behavior are not claimed verified.
+Python tests cover simulated reconnects, bounded USB transfers, rotation, SCM callback mapping and shutdown state. Windows CI executes safe PowerShell guard/delegation tests and the Windows mutex test; the runtime-staging tests also install the real Python/dependencies and exercise fresh, interrupted and repeated staging in temporary directories. CI does not register the actual service or access GPU sensors/USB hardware. Physical boot, sleep/resume and sensor behavior are not claimed verified.
 
 ## Source references
 
@@ -69,3 +69,5 @@ Python tests cover simulated reconnects, bounded USB transfers, rotation, SCM ca
 - [pywin32 service event example](https://github.com/mhammond/pywin32/blob/main/win32/Demos/service/serviceEvents.py)
 - [uv managed Python installation](https://docs.astral.sh/uv/guides/install-python/)
 - [Microsoft sc failure](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-failure)
+
+Python environment creation uses the protected uv-managed interpreter with [`python -m venv --copies --without-pip`](https://docs.python.org/3.11/library/venv.html). Package installation remains through `uv pip`; `uv venv --copies` is not a supported command.

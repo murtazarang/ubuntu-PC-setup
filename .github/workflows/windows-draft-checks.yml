@@ -96,3 +96,9 @@ jobs:
       - name: AX206 lifecycle and simulated USB tests
         shell: pwsh
         run: uv run --no-project --with Pillow --with PyYAML python -m unittest discover -s windows/aida64_display/tests -v
+      - name: Actual AX206 runtime staging (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/aida64_display/tests/test-runtime.ps1
+      - name: Actual AX206 runtime staging (PowerShell 7)
+        shell: pwsh
+        run: ./windows/aida64_display/tests/test-runtime.ps1
