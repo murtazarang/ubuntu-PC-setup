@@ -142,3 +142,67 @@ class DesktopGioTests(unittest.TestCase):
     time.sleep(.02)
    commands=[json.loads(x) for x in calls.read_text().splitlines()]
    self.assertEqual([c[0] for c in commands],['serve','ui']);self.assertIn(str(p/'model $x'),commands[0])
+
+class DirectCleanupTests(unittest.TestCase):
+ def run_cleanup(self,home,answer='DELETE LEGACY AI\n',systemctl=None):
+  bin=home/'bin';bin.mkdir(exist_ok=True)
+  if systemctl is not None:
+   ctl=bin/'systemctl';ctl.write_text(systemctl);ctl.chmod(0o755)
+  dpkg=bin/'dpkg-query';dpkg.write_text('#!/bin/sh\nexit 1\n');dpkg.chmod(0o755)
+  return subprocess.run(['bash',str(ROOT/'remove-legacy-ai.sh'),'--apply'],input=answer,text=True,capture_output=True,env=os.environ|{'HOME':str(home),'XDG_DATA_HOME':str(home/'data'),'XDG_CONFIG_HOME':str(home/'config'),'PATH':str(bin)+':'+os.environ['PATH']})
+ def test_direct_removal_preserves_chats_unrelated_and_no_quarantine(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);model=p/'data/strata/models';model.mkdir(parents=True);(model/'weight').write_text('model')
+   chat=p/'data/strata/chats';chat.mkdir();(chat/'history').write_text('keep')
+   (p/'.paseo').mkdir();(p/'.paseo/chat').write_text('keep')
+   r=self.run_cleanup(p);self.assertEqual(r.returncode,0,r.stderr)
+   self.assertFalse(model.exists());self.assertEqual((chat/'history').read_text(),'keep');self.assertTrue((p/'.paseo/chat').exists())
+   self.assertFalse((p/'data/pc-setup-legacy-ai-backup').exists())
+ def test_decline_keeps_model(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);model=p/'data/strata/models';model.mkdir(parents=True)
+   r=self.run_cleanup(p,'no\n');self.assertNotEqual(r.returncode,0);self.assertTrue(model.exists())
+ def test_symlinked_model_refused(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);outside=p/'unrelated';outside.mkdir();(outside/'keep').write_text('keep')
+   (p/'data/strata').mkdir(parents=True);(p/'data/strata/models').symlink_to(outside,target_is_directory=True)
+   r=self.run_cleanup(p);self.assertNotEqual(r.returncode,0);self.assertIn('symlinked',r.stderr);self.assertTrue((outside/'keep').exists())
+ def test_upstream_launcher_symlink_unlinked_after_native_stop(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);terminal=p/'data/strata/terminal';bin=terminal/'v1/bin';bin.mkdir(parents=True)
+   engine=bin/'strata';engine.write_text('#!/bin/sh\n[ "$1 $2" = "launch --stop" ] || exit 9\nprintf stopped > "$HOME/stopped"\n');engine.chmod(0o755)
+   (terminal/'current').symlink_to(terminal/'v1',target_is_directory=True)
+   local=p/'.local/bin';local.mkdir(parents=True);shim=local/'strata';shim.symlink_to(terminal/'current/bin/strata')
+   r=self.run_cleanup(p);self.assertEqual(r.returncode,0,r.stderr);self.assertFalse(shim.is_symlink());self.assertFalse(terminal.exists());self.assertEqual((p/'stopped').read_text(),'stopped')
+
+ def test_unknown_unit_preserved_when_systemctl_read_fails(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);unit=p/'config/systemd/user/xestrata.service';unit.parent.mkdir(parents=True);unit.write_text('[Service]\nExecStart=/other/app\n')
+   r=self.run_cleanup(p,systemctl='#!/bin/sh\nexit 1\n')
+   self.assertNotEqual(r.returncode,0);self.assertIn('Cannot validate',r.stderr);self.assertTrue(unit.exists())
+ def test_unknown_unit_preserved_when_read_succeeds(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);unit=p/'config/systemd/user/xestrata.service';unit.parent.mkdir(parents=True);unit.write_text('[Service]\nExecStart=/other/app\n')
+   r=self.run_cleanup(p,systemctl="#!/bin/sh\nprintf '%s\\n' '[Service]' 'ExecStart=/other/app'\n")
+   self.assertNotEqual(r.returncode,0);self.assertIn('Unrecognized',r.stderr);self.assertTrue(unit.exists())
+
+ def test_unit_parent_symlink_preserved(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);outside=p/'outside';outside.mkdir();unit=outside/'xestrata.service';unit.write_text('ExecStart=/usr/bin/xestrata --no-browser\n')
+   parent=p/'config/systemd';parent.mkdir(parents=True);(parent/'user').symlink_to(outside,target_is_directory=True)
+   r=self.run_cleanup(p,systemctl="#!/bin/sh\nprintf '%s\\n' '[Service]' 'ExecStart=/usr/bin/xestrata --no-browser'\n")
+   self.assertNotEqual(r.returncode,0);self.assertIn('Symlinked user service',r.stderr);self.assertTrue(unit.exists())
+
+ def test_running_runtime_executable_detected_despite_custom_argv0(self):
+  import shutil
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td);runtime=p/'data/strata/components';runtime.mkdir(parents=True);binary=runtime/'running';shutil.copy('/bin/sleep',binary)
+   proc=subprocess.Popen(['innocent-name','30'],executable=str(binary))
+   try:
+    r=self.run_cleanup(p);self.assertNotEqual(r.returncode,0);self.assertIn('still running',r.stderr);self.assertTrue(binary.exists())
+   finally:proc.terminate();proc.wait()
+ def test_multiple_execstart_unit_refused(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td)
+   r=self.run_cleanup(p,systemctl="#!/bin/sh\nprintf '%s\\n' '[Service]' 'ExecStart=/usr/bin/xestrata --no-browser' 'ExecStart=/other/app'\n")
+   self.assertNotEqual(r.returncode,0);self.assertIn('Unrecognized',r.stderr)
