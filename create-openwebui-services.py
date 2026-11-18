@@ -26,7 +26,7 @@ def owned(path, content):
     path.write_text(content)
     path.chmod(0o600)
 
-def configure(base, archives, home=None):
+def configure(base, archives, home=None, backend_env=None):
     base=Path(base).absolute(); home=Path(home or Path.home()); archives=Path(archives).absolute()
     no_links(base)
     base.mkdir(parents=True, exist_ok=True)
@@ -41,7 +41,15 @@ def configure(base, archives, home=None):
         # EnvironmentFile uses its own quoting, not systemd Exec percent escaping.
         values={'DATA_DIR':str(base/'data'),'WEBUI_SECRET_KEY':secret.read_text().strip(),
                 'OPENAI_API_BASE_URL':'http://127.0.0.1:8000/v1','OPENAI_API_KEY':'local',
-                'ENABLE_OLLAMA_API':'false','WEBUI_AUTH':'true','USE_CUDA_DOCKER':'true','USE_SLIM_DOCKER':'false'}
+                'ENABLE_OLLAMA_API':'false','WEBUI_AUTH':'true','USE_CUDA_DOCKER':'true','USE_SLIM_DOCKER':'false',
+                'RAG_EMBEDDING_MODEL':'BAAI/bge-small-en-v1.5',
+                'RAG_RERANKING_MODEL':'cross-encoder/ms-marco-MiniLM-L6-v2',
+                'ENABLE_RAG_HYBRID_SEARCH':'true','CHUNK_SIZE':'400','CHUNK_OVERLAP':'50',
+                'RAG_TEXT_SPLITTER':'token_transformers','RAG_TOKENIZER_MODEL':'BAAI/bge-small-en-v1.5',
+                'RAG_EMBEDDING_ENGINE':'','RAG_RERANKING_ENGINE':'',
+                'RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE':'false','RAG_RERANKING_MODEL_TRUST_REMOTE_CODE':'false',
+                'RAG_EMBEDDING_QUERY_PREFIX':'Represent this sentence for searching relevant passages: ',
+                'RAG_EMBEDDING_CONTENT_PREFIX':''}
         env.write_text('\n'.join(k+'='+json.dumps(v) for k,v in values.items())+'\n'); env.chmod(0o600)
     if secret.stat().st_mode & 0o077: raise SystemExit('Existing WebUI secret is not private; inspect its permissions.')
     # API key retained in a private file; no key in generated desktop files.
@@ -50,10 +58,27 @@ def configure(base, archives, home=None):
         fd=os.open(key, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
         with os.fdopen(fd,'w') as f:f.write(secrets.token_hex(32))
     if key.stat().st_mode & 0o077: raise SystemExit('Existing MCP key is not private; inspect its permissions.')
-    # mcpo needs --api-key, resolved at service generation (unit is user-private).
+    backend_path=base/'backend.env'
+    if backend_env is None:
+        backend={'USE_CUDA_DOCKER':'true','USE_SLIM_DOCKER':'false',
+                 'SENTENCE_TRANSFORMERS_BACKEND':'torch','SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND':'torch',
+                 'SENTENCE_TRANSFORMERS_MODEL_KWARGS':'{}','SENTENCE_TRANSFORMERS_CROSS_ENCODER_MODEL_KWARGS':'{}'}
+        check=[base/'tools/open-webui/bin/python','-c',"import torch; assert torch.cuda.is_available(), 'Open WebUI CUDA unavailable; refusing silent CPU fallback'; from open_webui.env import DEVICE_TYPE; assert DEVICE_TYPE == 'cuda', 'Open WebUI did not select CUDA'"]
+    else:
+        backend=json.loads(Path(backend_env).read_text())
+        import re
+        if not isinstance(backend,dict) or any(not re.fullmatch(r'[A-Z][A-Z0-9_]*',k) or not isinstance(v,str) or '\n' in v or '\r' in v for k,v in backend.items()):
+            raise SystemExit('Invalid backend environment mapping')
+        if backend.get('SENTENCE_TRANSFORMERS_BACKEND')!='openvino' or backend.get('SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND')!='openvino':
+            raise SystemExit('Expected explicit OpenVINO embeddings and reranking')
+        backend.update(USE_CUDA_DOCKER='false',USE_SLIM_DOCKER='false')
+        check=[base/'tools/open-webui/bin/python',base/'openwebui_gpu.py','verify-openvino']
+    owned(backend_path,MARKER+'\n'+'\n'.join(k+'='+json.dumps(v) for k,v in backend.items())+'\n')
+    forced=['/usr/bin/env',*[k+'='+v for k,v in backend.items()]]
+    # Backend variables are process-local and take precedence over inherited CPU/slim defaults.
     for name, args, extras in [
-      ('pc-setup-openwebui',['/usr/bin/env','USE_CUDA_DOCKER=true','USE_SLIM_DOCKER=false',base/'bin/open-webui','serve','--host','127.0.0.1','--port','8080'],
-       'EnvironmentFile='+str(env).replace('%','%%')+'\nExecStartPre='+' '.join(map(unit_quote,['/usr/bin/env','USE_CUDA_DOCKER=true','USE_SLIM_DOCKER=false',base/'tools/open-webui/bin/python','-c',"import torch; assert torch.cuda.is_available(), 'Open WebUI CUDA unavailable; refusing silent CPU fallback'; from open_webui.env import DEVICE_TYPE; assert DEVICE_TYPE == 'cuda', 'Open WebUI did not select CUDA'"]))+'\n'),
+      ('pc-setup-openwebui',forced+[base/'bin/open-webui','serve','--host','127.0.0.1','--port','8080'],
+       'EnvironmentFile='+str(env).replace('%','%%')+'\nExecStartPre='+' '.join(map(unit_quote,forced+check))+'\n'),
       ('pc-setup-wikipedia',[base/'bin/mcpo','--host','127.0.0.1','--port','8002','--api-key',key.read_text().strip(),'--',base/'bin/openzim-mcp',archives],'')]:
         owned(units/(name+'.service'), MARKER+'\n[Unit]\nDescription='+name+'\n[Service]\nType=exec\n'+extras+'ExecStart='+' '.join(map(unit_quote,args))+'\nRestart=on-failure\nRestartSec=5\n')
     launcher=base/'launch-webui.sh'
@@ -78,5 +103,5 @@ def configure(base, archives, home=None):
     return units
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--base',required=True);p.add_argument('--archives',required=True)
-    a=p.parse_args();configure(a.base,a.archives)
+    p=argparse.ArgumentParser();p.add_argument('--base',required=True);p.add_argument('--archives',required=True);p.add_argument('--backend-env')
+    a=p.parse_args();configure(a.base,a.archives,backend_env=a.backend_env)

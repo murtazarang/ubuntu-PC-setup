@@ -75,6 +75,15 @@ def webui_environment(config, inherited):
             raise RuntimeError('Existing WebUI settings disable CUDA; settings preserved.')
         env['USE_CUDA_DOCKER'] = 'true'
         env['USE_SLIM_DOCKER'] = 'false'
+        for key in ('SENTENCE_TRANSFORMERS_BACKEND', 'SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND'):
+            if preferences.get(key, 'torch') != 'torch':
+                raise RuntimeError('Existing NVIDIA retrieval backend is not torch; settings preserved.')
+            env[key] = 'torch'
+        for key in ('SENTENCE_TRANSFORMERS_MODEL_KWARGS', 'SENTENCE_TRANSFORMERS_CROSS_ENCODER_MODEL_KWARGS'):
+            if json.loads(preferences.get(key, '{}')) != {}:
+                raise RuntimeError('Existing NVIDIA retrieval model kwargs differ from managed CUDA settings; preserved.')
+            env[key] = '{}'
+
     return env
 
 
@@ -132,6 +141,10 @@ def main():
                 raise RuntimeError('NVIDIA CUDA is unavailable. No CPU fallback: check the driver and WebUI CUDA environment.')
             subprocess.run([config['webui_command'][0].replace('open-webui.exe', 'python.exe'), '-c',
                             "from open_webui.env import DEVICE_TYPE; assert DEVICE_TYPE == 'cuda', 'Open WebUI selected a non-CUDA device'"],
+                           env=env, cwd=root, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        if config['hardware'] == 'Intel':
+            import sys
+            subprocess.run([sys.executable, str(root / 'openwebui_gpu.py'), 'verify-openvino'],
                            env=env, cwd=root, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         env['DATA_DIR'] = str(root / 'data')
         for name, port, command in [('wikipedia', 8002, config['mcpo_command']),

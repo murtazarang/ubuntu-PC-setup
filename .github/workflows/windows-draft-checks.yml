@@ -164,7 +164,7 @@ jobs:
       - name: Install disposable protocol-test environments (CPU only; not user deployment)
         run: |
           uv venv --python 3.11 "$RUNNER_TEMP/webui"
-          uv pip install --python "$RUNNER_TEMP/webui/bin/python" --torch-backend cpu 'open-webui==0.13.4' 'torch==2.9.1'
+          uv pip install --python "$RUNNER_TEMP/webui/bin/python" --torch-backend cpu 'open-webui==0.13.4' 'torch==2.9.1' 'torchvision==0.24.1' 'sentence-transformers[openvino]==5.5.1' 'optimum-intel[openvino]==2.2.0' 'openvino==2026.4.1'
           uv venv --python 3.12 "$RUNNER_TEMP/mcpo"
           uv pip install --python "$RUNNER_TEMP/mcpo/bin/python" 'mcpo==0.0.20' 'mcp==1.30.0' 'fastapi==0.115.12'
           uv venv --python 3.12 "$RUNNER_TEMP/zim"
@@ -176,6 +176,12 @@ jobs:
           echo "72db7ae7708d3a4cff918495078901ec027b14b427433a2328286ec130d1c43b  $RUNNER_TEMP/zim-fixture/climate.zim" | sha256sum --check
       - name: Prepare all three complete audited skill repositories
         run: python3 openwebui_skills.py prepare --root "$RUNNER_TEMP/skill-repos"
-      - name: Real WebUI skills and Wikipedia roundtrip with simulated inference
+      - name: Prepare approved retrieval models in disposable CPU OpenVINO test cache
+        env:
+          HF_HOME: ${{ runner.temp }}/retrieval-cache
+          SENTENCE_TRANSFORMERS_HOME: ${{ runner.temp }}/retrieval-cache/hub
         run: |
-          python3 tests/openwebui_runtime_smoke.py --webui-exe "$RUNNER_TEMP/webui/bin/open-webui" --mcpo-exe "$RUNNER_TEMP/mcpo/bin/mcpo" --openzim-exe "$RUNNER_TEMP/zim/bin/openzim-mcp" --archive-dir "$RUNNER_TEMP/zim-fixture" --skills-root "$RUNNER_TEMP/skill-repos"
+          "$RUNNER_TEMP/webui/bin/python" tests/prepare_retrieval_smoke.py
+      - name: Real WebUI retrieval, skills and Wikipedia roundtrip with simulated Colibri inference
+        run: |
+          python3 tests/openwebui_runtime_smoke.py --webui-exe "$RUNNER_TEMP/webui/bin/open-webui" --mcpo-exe "$RUNNER_TEMP/mcpo/bin/mcpo" --openzim-exe "$RUNNER_TEMP/zim/bin/openzim-mcp" --archive-dir "$RUNNER_TEMP/zim-fixture" --skills-root "$RUNNER_TEMP/skill-repos" --retrieval-cache "$RUNNER_TEMP/retrieval-cache"

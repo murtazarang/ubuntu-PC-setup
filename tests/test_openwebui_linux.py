@@ -1,4 +1,4 @@
-import importlib.util, os, tempfile, unittest, shutil, subprocess
+import importlib.util, os, tempfile, unittest, shutil, subprocess, json
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
@@ -9,6 +9,10 @@ class Tests(unittest.TestCase):
  def test_services_preserve_state_and_ports(self):
   with tempfile.TemporaryDirectory() as t, patch.dict(os.environ,{},clear=True), patch('subprocess.check_output',side_effect=OSError()):
    home=Path(t);base=home/'app space';units=web.configure(base,home/'archives',home)
+   self.assertIn('BAAI/bge-small-en-v1.5',(base/'webui.env').read_text())
+   self.assertIn('Represent this sentence for searching relevant passages: ',(base/'webui.env').read_text())
+   self.assertIn('token_transformers',(base/'webui.env').read_text())
+   self.assertIn('CHUNK_SIZE=\"400\"',(base/'webui.env').read_text())
    secret=(base/'webui-secret').read_text();(base/'webui.env').write_text('CUSTOM=unchanged\n')
    web.configure(base,home/'archives',home)
    self.assertEqual((base/'webui-secret').read_text(),secret)
@@ -41,6 +45,15 @@ class Tests(unittest.TestCase):
    other=home/'other';other.write_text('keep');(base/'mcpo-key').unlink();(base/'mcpo-key').symlink_to(other)
    with self.assertRaises(SystemExit): web.configure(base,home/'archive',home)
    self.assertEqual(other.read_text(),'keep')
+ def test_openvino_gpu_mapping_and_launch_guard(self):
+  with tempfile.TemporaryDirectory() as t, patch.dict(os.environ,{},clear=True), patch('subprocess.check_output',side_effect=OSError()):
+   home=Path(t);base=home/'app';mapping=home/'mapping.json'
+   mapping.write_text(json.dumps({'SENTENCE_TRANSFORMERS_BACKEND':'openvino','SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND':'openvino','SENTENCE_TRANSFORMERS_MODEL_KWARGS':json.dumps({'device':'GPU.1'}),'SENTENCE_TRANSFORMERS_CROSS_ENCODER_MODEL_KWARGS':json.dumps({'device':'GPU.1'})}))
+   units=web.configure(base,home/'archive',home,backend_env=mapping)
+   text=(units/'pc-setup-openwebui.service').read_text()
+   self.assertIn('verify-openvino',text);self.assertIn('GPU.1',text);self.assertIn('USE_CUDA_DOCKER=false',text)
+   self.assertNotIn('torch.cuda.is_available',text)
+   self.assertEqual(json.loads(mapping.read_text())['SENTENCE_TRANSFORMERS_BACKEND'],'openvino')
  def test_service_collision(self):
   with tempfile.TemporaryDirectory() as t:
    p=Path(t)/'unit';p.write_text('unrelated')

@@ -1,6 +1,6 @@
 # Native Ubuntu: Open WebUI and Colibri
 
-No OMP is installed or used. Run `./setup.sh desktop` as the desktop user. This installs Open WebUI 0.13.4, mcpo 0.0.20, and OpenZIM MCP 3.4.0 into isolated uv tool environments. WebUI uses CUDA 12.8 PyTorch dependencies on the NVIDIA PCs; Intel supporting-model setup pauses pending an explicit backend choice. Colibri independently retains its Vulkan GPU backend. Existing skills, Wikipedia archives, and user configuration are retained.
+No OMP is installed or used. Run `./setup.sh desktop` as the desktop user. This installs Open WebUI 0.13.4, mcpo 0.0.20, and OpenZIM MCP 3.4.0 into isolated uv tool environments. WebUI uses CUDA 12.8 PyTorch dependencies on the NVIDIA PCs; Intel Arc B580 uses OpenVINO for embeddings and reranking. Its PyTorch CPU wheel is a library dependency, not the inference device: explicit `GPU.N` selection and preflight require the B580. Intel speech is not configured by this change. Colibri independently retains its Vulkan GPU backend. Existing skills, Wikipedia archives, and user configuration are retained.
 
 ## Daily use
 
@@ -50,3 +50,8 @@ PyTorch backend selection: https://docs.astral.sh/uv/guides/integration/pytorch/
 After the local WebUI account exists and its services are running, run `./migrate-openwebui.sh`. It first requires successful full skill and connection import/readback. It then offers to remove only `~/.local/bin/omp`, the official standalone installer default used by this repository. Type `REMOVE OMP` for that exact deletion. Alternate installations, Bun, skill files, custom settings, conversations and Wikipedia remain untouched. This script never removes data when import verification fails.
 
 See [shared verification and skill interoperability limits](openwebui-verification.md).
+Intel embeddings/reranking references: https://www.sbert.net/docs/sentence_transformer/usage/efficiency.html and the tagged Open WebUI `routers/retrieval.py` native backend/model-kwargs forwarding. Setup probes native embedding and reranking inference; launch rechecks exact B580 availability. No B580 execution has been performed in the development environment.
+
+### Approved retrieval defaults
+
+Fresh configurations use `BAAI/bge-small-en-v1.5` embeddings and `cross-encoder/ms-marco-MiniLM-L6-v2` reranking, with token-based chunks of 400 and overlap of 50. Existing retrieval configurations and indexed knowledge are preserved; changing embedding models requires deliberate reindexing, not silent reuse of old vectors. The shared first-use configuration helper applies and verifies these settings only under its preservation rules. B580 installation probes these exact model IDs on OpenVINO GPU; NVIDIA remains CUDA.

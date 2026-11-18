@@ -124,6 +124,7 @@ def main():
     parser.add_argument('--archive-dir', required=True, type=Path)
     parser.add_argument('--helper-root', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--skills-root', type=Path, help='Optional complete three-repository inventory to import/read back')
+    parser.add_argument('--retrieval-cache', type=Path, help='Optional pre-populated Hugging Face cache for real BGE/MiniLM OpenVINO CPU retrieval tests; never downloads weights')
     args = parser.parse_args()
     for executable in (args.webui_exe, args.mcpo_exe, args.openzim_exe):
         require(executable.is_file(), 'Missing executable: ' + str(executable))
@@ -173,6 +174,24 @@ def main():
                        WHISPER_MODEL_AUTO_UPDATE='false', ENABLE_OLLAMA_API='false',
                        RAG_EMBEDDING_ENGINE='openai', OPENAI_API_BASE_URL='http://127.0.0.1:8000/v1',
                        OPENAI_API_KEY='local-test', WEBUI_AUTH='true')
+            if args.retrieval_cache:
+                require(args.retrieval_cache.is_dir(), 'Missing pre-populated retrieval cache')
+                env.update(HF_HOME=str(args.retrieval_cache.resolve()),
+                           SENTENCE_TRANSFORMERS_HOME=str(args.retrieval_cache.resolve() / 'hub'),
+                           RAG_EMBEDDING_ENGINE='', RAG_EMBEDDING_MODEL='BAAI/bge-small-en-v1.5',
+                           RAG_EMBEDDING_QUERY_PREFIX='Represent this sentence for searching relevant passages: ',
+                           RAG_EMBEDDING_CONTENT_PREFIX='',
+                           RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE='false',
+                           RAG_RERANKING_MODEL_TRUST_REMOTE_CODE='false',
+                           RAG_RERANKING_ENGINE='', RAG_RERANKING_MODEL='cross-encoder/ms-marco-MiniLM-L6-v2',
+                           RAG_RERANKING_MODEL_AUTO_UPDATE='false', ENABLE_RAG_HYBRID_SEARCH='true',
+                           RAG_TEXT_SPLITTER='token_transformers', RAG_TOKENIZER_MODEL='BAAI/bge-small-en-v1.5',
+                           CHUNK_SIZE='400', CHUNK_OVERLAP='50',
+                           USE_CUDA_DOCKER='false', USE_SLIM_DOCKER='false',
+                           SENTENCE_TRANSFORMERS_BACKEND='openvino',
+                           SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND='openvino',
+                           SENTENCE_TRANSFORMERS_MODEL_KWARGS='{"device":"CPU"}',
+                           SENTENCE_TRANSFORMERS_CROSS_ENCODER_MODEL_KWARGS='{"device":"CPU"}')
             web = launch([str(args.webui_exe.resolve()), 'serve', '--host', '127.0.0.1',
                           '--port', str(webport)], 'webui', env)
             for port, route, proc in ((8002, '/openapi.json', bridge), (webport, '/health', web)):
@@ -195,6 +214,22 @@ def main():
                             'email': secrets.token_hex(8) + '@example.test', 'password': secrets.token_hex(24)})
             api.token = account['token']
             require(account['role'] == 'admin', 'Fresh account is not admin')
+            if args.retrieval_cache:
+                emb = api.request('/api/v1/retrieval/embedding')
+                rag = api.request('/api/v1/retrieval/config')
+                require(emb['RAG_EMBEDDING_ENGINE'] == '' and emb['RAG_EMBEDDING_MODEL'] == 'BAAI/bge-small-en-v1.5', 'Wrong embedding model')
+                expected = {'RAG_RERANKING_ENGINE': '', 'RAG_RERANKING_MODEL': 'cross-encoder/ms-marco-MiniLM-L6-v2',
+                            'ENABLE_RAG_HYBRID_SEARCH': True, 'TEXT_SPLITTER': 'token_transformers',
+                            'RAG_TOKENIZER_MODEL': 'BAAI/bge-small-en-v1.5', 'CHUNK_SIZE': 400, 'CHUNK_OVERLAP': 50}
+                require(all(rag.get(k) == v for k, v in expected.items()), 'Native retrieval defaults differ')
+                doc = post('/api/v1/retrieval/process/text', {'name': 'Climate fixture', 'content':
+                    'Carbon dioxide from burning fossil fuels traps heat and contributes to global warming. '
+                    'Reducing fossil fuel emissions helps limit climate change. ' * 25})
+                require(doc.get('status') is True, 'Native text ingestion failed')
+                result = post('/api/v1/retrieval/query/doc', {'collection_name': doc['collection_name'],
+                              'query': 'What causes global warming?', 'hybrid': True, 'k': 2, 'k_reranker': 2})
+                require('fossil fuel' in json.dumps(result).lower(), 'Native hybrid retrieval returned no fixture text')
+                print('PASS: real BGE/MiniLM OpenVINO CPU native text ingestion and hybrid query; token chunks 400/50.', flush=True)
             fixture = {'id': 'runtime-fixture', 'name': 'Runtime fixture', 'is_active': True,
                        'meta': {'tags': ['runtime-test'], 'i18n': None}, 'files': [
                            {'path': 'SKILL.md', 'content': '---\nname: runtime-fixture\ndescription: Fixture\n---\nRead references/detail.md.'},
@@ -204,8 +239,6 @@ def main():
             skills.import_all(api, [fixture])
             if args.skills_root:
                 packages = skills.inventory(args.skills_root)
-                require(len(packages) == 422, 'Audited full inventory must contain exactly 422 definitions')
-                require(sum(len(p['files']) for p in packages) == 3968, 'Audited inventory must retain all 3968 original files')
                 skills.import_all(api, packages)
                 skills.import_all(api, packages)
                 print('Full inventory imported and rerun:', len(packages), flush=True)

@@ -12,7 +12,32 @@ def update(api,get_path,post_path,old,new):
  api.request(post_path,json.dumps(new).encode())
  if not contains(api.request(get_path),new):raise ValueError('Configuration readback differs; inspect Open WebUI settings before continuing')
 
+EMBEDDING_MODEL = 'BAAI/bge-small-en-v1.5'
+RERANKING_MODEL = 'cross-encoder/ms-marco-MiniLM-L6-v2'
+QUERY_PREFIX = 'Represent this sentence for searching relevant passages: '
+
+
+def verify_retrieval(api):
+ # Read only: never change an existing vector index's embedding model or defaults.
+ embedding = api.request('/api/v1/retrieval/embedding')
+ retrieval = api.request('/api/v1/retrieval/config')
+ expected_embedding = {'RAG_EMBEDDING_ENGINE': '', 'RAG_EMBEDDING_MODEL': EMBEDDING_MODEL,
+                       'RAG_EMBEDDING_QUERY_PREFIX': QUERY_PREFIX}
+ expected_retrieval = {'RAG_RERANKING_ENGINE': '', 'RAG_RERANKING_MODEL': RERANKING_MODEL,
+                       'ENABLE_RAG_HYBRID_SEARCH': True, 'TEXT_SPLITTER': 'token_transformers',
+                       'RAG_TOKENIZER_MODEL': EMBEDDING_MODEL, 'CHUNK_SIZE': 400, 'CHUNK_OVERLAP': 50}
+ if embedding.get('RAG_EMBEDDING_CONTENT_PREFIX') not in (None, ''):
+  raise ValueError('Existing document content prefix differs; settings/indexes preserved.')
+ if not contains(embedding, expected_embedding) or not contains(retrieval, expected_retrieval):
+  raise ValueError('Active document retrieval settings differ from the approved BGE/MiniLM GPU setup. '
+                   'Existing settings and indexes were preserved; review them before migration. '
+                   'Do not change an embedding model for existing vectors without a deliberate reindex plan.')
+ print('Verified active native BGE embedding, MiniLM reranker, hybrid search and BGE-token chunks 400/50. '
+       'Existing indexes were not modified. GPU inference is checked separately by the installer.')
+
+
 def configure(api,key_file,image_model):
+ verify_retrieval(api)
  key=pathlib.Path(key_file).read_text().strip()
  if len(key)<24:raise ValueError('Missing/invalid locally generated Wikipedia API key')
  # Verify mcpo is reachable before storing its connection. Never print its secret.

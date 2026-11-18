@@ -4,9 +4,10 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $colibri=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json') -Raw|ConvertFrom-Json
-if($colibri.hardware -eq 'Intel'){throw 'Intel Open WebUI GPU configuration is pending an explicitly supported choice. No CPU fallback was installed.'}
 # PyTorch official Windows/Linux 2.9.1 CUDA12.8 wheels; source-matched WebUI CUDA path.
-$TorchBackend='cu128'
+$TorchBackend=if($colibri.hardware -eq 'Intel'){'cpu'}else{'cu128'}
+$embeddingModel='BAAI/bge-small-en-v1.5'
+$rerankingModel='cross-encoder/ms-marco-MiniLM-L6-v2'
 $uv=(Get-Command uv.exe -CommandType Application -ErrorAction Stop).Source
 $root=Join-Path $env:LOCALAPPDATA 'OpenWebUI-PC-Setup'
 New-Item -ItemType Directory -Path $root -Force|Out-Null
@@ -16,10 +17,26 @@ if($LASTEXITCODE -ne 0){throw 'Open WebUI Python environment creation failed.'}
 # CUDA supporting models are authorized. Exact backend must match tested driver compatibility.
 $installHelp=(& $uv pip install --help | Out-String)
 if($LASTEXITCODE -ne 0 -or $installHelp -notmatch '--torch-backend'){throw 'Installed uv does not support --torch-backend. Update uv using its installation method, then rerun.'}
-& $uv pip install --torch-backend $TorchBackend --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'psutil==7.2.2'
+if($colibri.hardware -eq 'Intel'){
+    # CPU torch supplies import/export utilities only. Retrieval inference is explicitly OpenVINO B580 GPU.
+    & $uv pip install --torch-backend cpu --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'torchvision==0.24.1' 'psutil==7.2.2' 'sentence-transformers[openvino]==5.5.1' 'optimum-intel[openvino]==2.2.0' 'openvino==2026.4.1'
+}else{
+    & $uv pip install --torch-backend cu128 --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'torchvision==0.24.1' 'psutil==7.2.2' 'sentence-transformers==5.5.1'
+}
 if($LASTEXITCODE -ne 0){throw 'Open WebUI dependencies failed. Rerun to retry; existing data is retained.'}
-& $python -c "import torch; assert torch.cuda.is_available(), 'CUDA unavailable; no CPU fallback. Check NVIDIA driver/CUDA wheel compatibility.'; print('CUDA supporting-model device:', torch.cuda.get_device_name(0))"
-if($LASTEXITCODE -ne 0){throw 'Open WebUI CUDA verification failed. No CPU fallback was configured.'}
+Copy-Item -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) 'openwebui_gpu.py') -Destination $root -Force
+if($colibri.hardware -eq 'Intel'){
+    $gpuJson=& $python (Join-Path $root 'openwebui_gpu.py') detect-openvino
+    if($LASTEXITCODE -ne 0){throw 'B580 OpenVINO GPU detection failed. No CPU fallback.'}
+    $gpuEnvironment=$gpuJson|ConvertFrom-Json
+    $probeCode="import json,os,subprocess,sys; env=os.environ.copy(); env.update(json.loads(sys.argv[2])); env['DATA_DIR']=sys.argv[5]; env.update(RAG_EMBEDDING_MODEL=sys.argv[3],RAG_RERANKING_MODEL=sys.argv[4],RAG_EMBEDDING_ENGINE='',RAG_RERANKING_ENGINE='',ENABLE_RAG_HYBRID_SEARCH='true',CHUNK_SIZE='400',CHUNK_OVERLAP='50',RAG_TEXT_SPLITTER='token_transformers',RAG_TOKENIZER_MODEL=sys.argv[3],RAG_EMBEDDING_QUERY_PREFIX='Represent this sentence for searching relevant passages: ',RAG_EMBEDDING_CONTENT_PREFIX=''); subprocess.run([sys.executable,sys.argv[1],'probe-openvino','--embedding-model',sys.argv[3],'--reranking-model',sys.argv[4]],env=env,check=True)"
+    & $python -c $probeCode (Join-Path $root 'openwebui_gpu.py') ($gpuEnvironment|ConvertTo-Json -Compress) $embeddingModel $rerankingModel (Join-Path $root 'data')
+    if($LASTEXITCODE -ne 0){throw 'Native Open WebUI retrieval inference did not verify on B580 GPU. No CPU fallback.'}
+}else{
+    & $python -c "import torch; assert torch.cuda.is_available(), 'CUDA unavailable; no CPU fallback. Check NVIDIA driver/CUDA wheel compatibility.'; print('CUDA supporting-model device:', torch.cuda.get_device_name(0))"
+    if($LASTEXITCODE -ne 0){throw 'Open WebUI CUDA verification failed. No CPU fallback was configured.'}
+    $gpuEnvironment=[pscustomobject]@{USE_CUDA_DOCKER='true';USE_SLIM_DOCKER='false';SENTENCE_TRANSFORMERS_BACKEND='torch';SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND='torch';SENTENCE_TRANSFORMERS_MODEL_KWARGS='{}';SENTENCE_TRANSFORMERS_CROSS_ENCODER_MODEL_KWARGS='{}'}
+}
 $colibri=Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json') -Raw|ConvertFrom-Json
 # mcpo requires its own compatible SDK/FastAPI, separate from WebUI and OpenZIM.
 $bridgePython=Join-Path $root 'mcpo-venv\Scripts\python.exe'
@@ -35,6 +52,14 @@ if(-not(Test-Path -LiteralPath $keyPath)){
     if($LASTEXITCODE -ne 0){throw 'Local Wikipedia bridge key creation failed.'}
 }
 $wikiKey=(Get-Content -LiteralPath $keyPath -Raw).Trim()
+$managedEnvironment=@{WEBUI_AUTH='true';OPENAI_API_BASE_URL='http://127.0.0.1:8000/v1';OPENAI_API_KEY='local-colibri';ENABLE_OLLAMA_API='false';ENABLE_WEB_SEARCH='true';WEB_SEARCH_ENGINE='duckduckgo';RAG_EMBEDDING_ENGINE='';RAG_RERANKING_ENGINE='';ENABLE_RAG_HYBRID_SEARCH='true';CHUNK_SIZE='400';CHUNK_OVERLAP='50';RAG_TEXT_SPLITTER='token_transformers';RAG_TOKENIZER_MODEL=$embeddingModel;RAG_EMBEDDING_QUERY_PREFIX='Represent this sentence for searching relevant passages: ';RAG_EMBEDDING_CONTENT_PREFIX='';RAG_EMBEDDING_MODEL=$embeddingModel;RAG_RERANKING_MODEL=$rerankingModel;RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE='false';RAG_RERANKING_MODEL_TRUST_REMOTE_CODE='false'}
+foreach($property in $gpuEnvironment.PSObject.Properties){$managedEnvironment[$property.Name]=[string]$property.Value}
+if($colibri.hardware -ne 'Intel'){
+    $probeCode="import json,os,subprocess,sys; env=os.environ.copy(); env.update(json.loads(sys.argv[2])); env['DATA_DIR']=sys.argv[5]; subprocess.run([sys.executable,sys.argv[1],'probe-cuda','--embedding-model',sys.argv[3],'--reranking-model',sys.argv[4]],env=env,check=True)"
+    & $python -c $probeCode (Join-Path $root 'openwebui_gpu.py') ($managedEnvironment|ConvertTo-Json -Compress) $embeddingModel $rerankingModel (Join-Path $root 'data')
+    if($LASTEXITCODE -ne 0){throw 'Native Open WebUI embedding/reranking CUDA inference did not verify. No CPU fallback.'}
+}
+
 $configPath=Join-Path $root 'desktop.json'
 if(-not(Test-Path -LiteralPath $configPath)){
     @{
@@ -45,7 +70,7 @@ if(-not(Test-Path -LiteralPath $configPath)){
         image_model=(Join-Path $colibri.models 'qwen-image-2.1\model')
         webui_command=@((Join-Path $root 'venv\Scripts\open-webui.exe'),'serve','--host','127.0.0.1','--port','8080')
         mcpo_command=@((Join-Path $root 'mcpo-venv\Scripts\mcpo.exe'),'--host','127.0.0.1','--port','8002','--api-key',$wikiKey,'--',$reference.bridge,$reference.archive_directory)
-        webui_environment=@{WEBUI_AUTH='true';USE_CUDA_DOCKER='true';USE_SLIM_DOCKER='false';OPENAI_API_BASE_URL='http://127.0.0.1:8000/v1';OPENAI_API_KEY='local-colibri';ENABLE_OLLAMA_API='false';ENABLE_WEB_SEARCH='true';WEB_SEARCH_ENGINE='duckduckgo'}
+        webui_environment=$managedEnvironment
     }|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $configPath -Encoding utf8
 }else{Write-Host "Preserving existing runtime settings: $configPath"}
 foreach($icon in @('colibri-serve.ico','colibri-serve-image.ico')){

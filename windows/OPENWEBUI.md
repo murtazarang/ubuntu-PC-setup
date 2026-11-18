@@ -26,8 +26,8 @@ Python ownership tests exercise PID-reuse and command-change guards and terminat
 - [Colibri v2.1.0](https://github.com/JustVugg/colibri/tree/v2.1.0)
 - [psutil process identity and termination](https://psutil.readthedocs.io/en/latest/#process-class)
 
-NVIDIA GPU supporting models are approved; PyTorch 2.9.1 CUDA 12.8 wheels are selected and CUDA availability is checked during installation and UI launch. Intel's WebUI supporting-model backend remains pending and this candidate refuses a silent CPU fallback. Colibri inference still uses Vulkan. OpenZIM runs in its own Python 3.12 environment; mcpo has an isolated Python environment pinned to mcpo0.0.20, mcp1.30.0 and FastAPI0.115.12.
+NVIDIA GPU supporting models are approved; PyTorch 2.9.1 CUDA 12.8 wheels are selected and CUDA availability is checked during installation and UI launch. Intel Arc B580 runs native OpenVINO embeddings and reranking with explicit GPU selection and an installation inference probe; missing GPU or CPU execution fails setup. PyTorch CPU wheels on Intel provide library/export utilities, not a retrieval inference fallback. Colibri inference still uses Vulkan. OpenZIM runs in its own Python 3.12 environment; mcpo has an isolated Python environment pinned to mcpo0.0.20, mcp1.30.0 and FastAPI0.115.12.
 
 CUDA wheel source: https://pytorch.org/get-started/previous-versions/#v291. WebUI supporting PyTorch models use CUDA; this is not evidence that Whisper CTranslate2 or every optional tool can use the GPU. Their additional CUDA/cuDNN dependencies and hardware behavior need separate validation.
 
-See [shared verification and skill interoperability limits](../docs/openwebui-verification.md).
+Fresh retrieval defaults use BAAI/bge-small-en-v1.5 and cross-encoder/ms-marco-MiniLM-L6-v2, tokenizer-based 400-token chunks with 50-token overlap. Existing indexes/settings are not overwritten or reindexed. First OpenVINO export/model loading may take time. Actual B580 hardware testing remains unperformed here; the installer performs the check on the target PC.
