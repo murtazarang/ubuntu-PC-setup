@@ -10,8 +10,6 @@ function Get-Command {
     param($Name, $CommandType, $ErrorAction)
     switch ($Name) {
         'uv.exe' { [pscustomobject]@{Source='Invoke-ReferenceUv'} }
-        'uvx.exe' { [pscustomobject]@{Source='unused-uvx.exe'} }
-        'omp.exe' { [pscustomobject]@{Source='Invoke-ReferenceOmp'} }
         default { throw "Unexpected command lookup: $Name" }
     }
 }
@@ -20,12 +18,9 @@ function Invoke-ReferenceUv {
     if ($args[0] -eq 'tool') {
         $ReferenceFixture.InstallCalls++
         if ($ReferenceFixture.FailInstall) { $global:LASTEXITCODE = 1 }
-    } elseif ($args[0] -eq 'run') {
-        $ReferenceFixture.RegisterCalls++
-        Assert-Reference ($ReferenceFixture.HashCalls -eq 1) 'Registration must follow archive verification.'
     } else { throw 'Unexpected uv call' }
 }
-function Invoke-ReferenceOmp { $global:LASTEXITCODE = 0; 'C:\fixture\agent' }
+
 function New-Item { param($ItemType, [switch]$Force, $Path) }
 function Test-Path {
     param($LiteralPath, $PathType)
@@ -39,6 +34,21 @@ function Get-Item {
     [pscustomobject]@{Length=49GB; PSDrive=[pscustomobject]@{Free=$ReferenceFixture.Free}}
 }
 function Get-Content { param($LiteralPath, [switch]$Raw); $ReferenceFixture.Checksum }
+function Set-Content {
+    [CmdletBinding()]
+    param($LiteralPath, $Encoding, [Parameter(ValueFromPipeline=$true)]$Value)
+    process {
+        Assert-Reference ($LiteralPath -eq 'C:\fixture\OpenZIM\reference.json') 'Only reference manifest may be written.'
+        Assert-Reference ($ReferenceFixture.HashCalls -eq 1) 'Manifest registration must follow archive verification.'
+        $manifest=$Value|ConvertFrom-Json
+        Assert-Reference ($manifest.sha256 -eq $ReferenceFixture.ActualHash) 'Manifest must contain verified SHA256.'
+        Assert-Reference ($manifest.bridge -eq 'Invoke-ReferenceBridge') 'Manifest must preserve installed bridge path.'
+        Assert-Reference ($manifest.archive_directory -eq 'C:\fixture\archives') 'Manifest must preserve requested archive directory.'
+        Assert-Reference ($manifest.archive -eq 'C:\fixture\archives\wikipedia_en_all_nopic_2026-06.zim') 'Manifest must name verified archive.'
+        $ReferenceFixture.RegisterCalls++
+    }
+}
+
 function Get-FileHash {
     param($LiteralPath, $Algorithm)
     Assert-Reference ($Algorithm -eq 'SHA256') 'Expected SHA256.'

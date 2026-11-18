@@ -65,5 +65,6 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     Write-Host "Verified existing archive $final"
 }
 $reference = Join-Path $env:LOCALAPPDATA 'OpenZIM\reference.json'
+New-Item -ItemType Directory -Force -Path (Split-Path $reference -Parent) | Out-Null
 @{bridge=$bridge;archive_directory=$ArchiveDirectory;archive=$final;sha256=$expectedHash}|ConvertTo-Json|Set-Content -LiteralPath $reference -Encoding utf8
 Write-Host "Verified offline Wikipedia. Open WebUI will use the local OpenZIM bridge: $final"
