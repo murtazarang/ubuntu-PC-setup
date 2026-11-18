@@ -15,6 +15,12 @@ class WindowsDocumentationTests(unittest.TestCase):
             self.assertNotIn(key, folded, f'Windows filename collision: {folded.get(key)} / {path}')
             folded[key] = path
 
+    def test_migration_documents_ui_only_startup(self):
+        text = (ROOT / 'windows/MIGRATE-AI.md').read_text()
+        self.assertNotIn('Starts the text server', text)
+        self.assertIn('does not start or switch text/image model servers', text)
+        self.assertIn('Migrate-ExistingAI.ps1', text)
+
     def test_every_installed_shortcut_is_documented(self):
         installer = (ROOT / 'windows/Install-OpenWebUI.ps1').read_text()
         names = re.findall(r"@\{name='([^']+)'", installer)

@@ -13,7 +13,7 @@ Choose your PC when prompted. This launcher uses the already-installed PowerShel
 The migration:
 1. Reuses the existing OpenZIM reference manifest's archive location and verifies the corpus checksum. Without a manifest it uses the original default archive directory. Pass `-ArchiveDirectory` to the downloaded `Migrate-ExistingAI.ps1` if you moved the corpus.
 2. Provisions Colibri and Open WebUI and their supporting GPU models/complete skill collections. Existing verified model artifacts are reused.
-3. Starts the text server and WebUI. Create your local account in the browser on first launch, then return to the terminal. No cloud account is created.
+3. Starts WebUI and the Wikipedia bridge only; it does not start or switch text/image model servers. Create your local account in the browser on first launch, then return to the terminal. No cloud account is created.
 4. Imports and reads back the complete skill packages, verifies the persisted connections/retrieval settings and rechecks Wikipedia. Failure stops before uninstalling anything.
 5. Checks that no active corpus, replacement model directory, WebUI data/skills, or preserved OMP skill/config root overlaps a proposed legacy deletion.
 6. Runs the existing exact-confirmation Paseo/Strata/XeStrata cleanup, then confirmed OMP program removal. Declining cleanup means migration is incomplete, not success. Retired OMP configuration is preserved rather than edited through its old CLI.
