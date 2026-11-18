@@ -105,8 +105,8 @@ foreach($item in @(@{name='Colibri Serve';action='text';icon='colibri-serve.ico'
     $link.Save()
 }
 Write-Host 'Open WebUI installed. Open Colibri Serve, then Open WebUI. Create your local account on first launch.'
-Write-Host 'After first sign-up, import and verify the complete skills using:'
-Write-Host "& '$python' '$(Join-Path $root 'openwebui_skills.py')' import --root '$(Join-Path $root 'skill-repos')' --url http://127.0.0.1:8080"
+Write-Host 'After first sign-up, double-click Finish Open WebUI Setup, or run:'
+Write-Host ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $root 'Finish-OpenWebUI.ps1')+'" -Root "'+$root+'"')
 Write-Host 'Existing OMP skills and Wikipedia have not been removed. Skill import must succeed before cleanup.'
 
 # First-run account remains user-chosen; this shortcut completes authenticated imports.
