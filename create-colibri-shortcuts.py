@@ -2,6 +2,7 @@
 """Install desktop entries invoking the upstream Colibri CLI, not a new launcher."""
 import argparse
 import os
+import json
 from pathlib import Path
 import subprocess
 
@@ -51,6 +52,18 @@ def install(cli, model, icon, dual, home=None, image=False, python=None):
     if unit.exists() and unit.read_text()!=content: raise SystemExit('Existing managed service was customized; retained: '+str(unit))
     unit.write_text(content)
     unit.chmod(0o600)
+    # Exact active model roots are recorded for the separate legacy migration guard.
+    state=Path(os.environ.get('XDG_DATA_HOME',str(home/'.local/share')))/'pc-setup-colibri/managed-models.json'
+    for candidate in (state,*state.parents):
+        if candidate.is_symlink(): raise SystemExit('Refusing linked model inventory: '+str(candidate))
+    inventory=json.loads(state.read_text()) if state.exists() else {'owner':'ubuntu-PC-setup','roots':{}}
+    if not isinstance(inventory,dict) or inventory.get('owner')!='ubuntu-PC-setup' or not isinstance(inventory.get('roots'),dict):
+        raise SystemExit('Unrecognized model inventory preserved')
+    root=str(Path(model).absolute().parent)
+    if slug in inventory['roots'] and inventory['roots'][slug]!=root:
+        raise SystemExit('Different existing model root preserved; inspect migration inventory')
+    inventory['roots'][slug]=root
+    state.parent.mkdir(parents=True,exist_ok=True);state.write_text(json.dumps(inventory,indent=2)+'\n');state.chmod(0o600)
     command = '/usr/bin/systemctl --user start ' + service
     text = '\n'.join(['[Desktop Entry]', 'Type=Application', f'Name={name}',
         'Comment=Start the local Colibri model server',

@@ -19,9 +19,9 @@ $installHelp=(& $uv pip install --help | Out-String)
 if($LASTEXITCODE -ne 0 -or $installHelp -notmatch '--torch-backend'){throw 'Installed uv does not support --torch-backend. Update uv using its installation method, then rerun.'}
 if($colibri.hardware -eq 'Intel'){
     # CPU torch supplies import/export utilities only. Retrieval inference is explicitly OpenVINO B580 GPU.
-    & $uv pip install --torch-backend cpu --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'torchvision==0.24.1' 'psutil==7.2.2' 'sentence-transformers[openvino]==5.5.1' 'optimum-intel[openvino]==2.2.0' 'openvino==2026.4.1'
+    & $uv pip install --torch-backend cpu --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'psutil==7.2.2' 'sentence-transformers[openvino]==5.5.1' 'optimum-intel[openvino]==2.2.0' 'openvino==2026.4.1'
 }else{
-    & $uv pip install --torch-backend cu128 --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'torchvision==0.24.1' 'psutil==7.2.2' 'sentence-transformers==5.5.1'
+    & $uv pip install --torch-backend cu128 --python $python 'open-webui==0.13.4' 'torch==2.9.1' 'psutil==7.2.2'
 }
 if($LASTEXITCODE -ne 0){throw 'Open WebUI dependencies failed. Rerun to retry; existing data is retained.'}
 Copy-Item -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) 'openwebui_gpu.py') -Destination $root -Force
@@ -78,8 +78,6 @@ foreach($icon in @('colibri-serve.ico','colibri-serve-image.ico')){
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'openwebui_desktop.py') -Destination $root -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Finish-OpenWebUI.ps1') -Destination $root -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Remove-VerifiedOMP.ps1') -Destination $root -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Remove-OMPBinary.ps1') -Destination $root -Force
 $repo=Split-Path $PSScriptRoot -Parent
 Copy-Item -LiteralPath (Join-Path $repo 'openwebui_skills.py') -Destination $root -Force
 Copy-Item -LiteralPath (Join-Path $repo 'openwebui_connections.py') -Destination $root -Force
@@ -105,9 +103,9 @@ foreach($item in @(@{name='Colibri Serve';action='text';icon='colibri-serve.ico'
     $link.Save()
 }
 Write-Host 'Open WebUI installed. Open Colibri Serve, then Open WebUI. Create your local account on first launch.'
-Write-Host 'After first sign-up, double-click Finish Open WebUI Setup, or run:'
-Write-Host ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $root 'Finish-OpenWebUI.ps1')+'" -Root "'+$root+'"')
-Write-Host 'Existing OMP skills and Wikipedia have not been removed. Skill import must succeed before cleanup.'
+Write-Host 'After first sign-up, import and verify the complete skills using:'
+Write-Host "& '$python' '$(Join-Path $root 'openwebui_skills.py')' import --root '$(Join-Path $root 'skill-repos')' --url http://127.0.0.1:8080"
+Write-Host 'Fresh setup does not inspect or remove legacy AI installations. Use migrate-ai.ps1 for an existing PC.'
 
 # First-run account remains user-chosen; this shortcut completes authenticated imports.
 $finish=Join-Path $desktop 'Finish Open WebUI Setup.lnk'

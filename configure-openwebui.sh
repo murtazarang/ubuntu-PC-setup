@@ -17,7 +17,7 @@ fi
 python3 - "$here" "$base" <<'PYHELPER'
 import pathlib,sys,shutil
 source,dest=map(pathlib.Path,sys.argv[1:])
-names=['openwebui_gpu.py','openwebui_skills.py','openwebui_connections.py','migrate-openwebui.sh','remove-omp-runtime.py']
+names=['openwebui_gpu.py','openwebui_skills.py','openwebui_connections.py','finish-openwebui.sh']
 for name in names:
  src=source/name;target=dest/name
  if not src.is_file():raise SystemExit('Missing setup companion: '+str(src))

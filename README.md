@@ -64,7 +64,7 @@ Use the **Colibri Serve** and **Colibri Serve Image** desktop shortcuts to start
 
 Setup also downloads the native Qwen-Image-2.1 checkpoint (about 33 GB) with the same resume/hash/reuse checks, and creates **Colibri Serve Image** with a **Serve Img** icon label. It invokes upstream `coli web` directly on loopback port **8001**, using isolated Python with NumPy and Pillow. Text Serve uses **8000**. Run one at a time unless memory permits both; separate ports do not guarantee enough combined GPU/RAM capacity. Image generation is distinct from the text model's input capabilities. The image checkpoint's license limits use to research/evaluation; read its downloaded LICENSE before use. The image shortcut opens the upstream image-generation web frontend automatically. The modern `coli ui` does not implement image generation, so it is used only for text. No third desktop UI shortcut is created.
 
-For an existing setup, first preview `./remove-legacy-ai.sh`; use `./remove-legacy-ai.sh --apply` to uninstall the known packages and directly delete the exact listed runtime/model download subtrees. It requires typing `DELETE LEGACY AI` after displaying those paths. No quarantine or new backup is created. Chat/history/config/state, shared packages, OMP/skills/Wikipedia, external models and earlier backups are preserved; external configured data folders are reported, not blindly wiped. Recognized native services are stopped; any remaining running app must be closed before deletion. Symlinked or mounted deletion roots are refused. If protected same-user processes cannot be inspected, the script explicitly requests sudo for a read-only rescan of those PIDs; declining stops cleanup without deletion. No processes are force-killed and no security settings are changed. Then run `./configure-ai.sh`. The obsolete `connect-xestrata.sh` is replaced by `connect-colibri.sh`.
+For an existing setup, use the [dedicated AI migration workflow](#existing-ubuntu-pcs-ai-migration-only), not the fresh Desktop stage. It verifies the replacement before explicit cleanup. The standalone `remove-legacy-ai.sh` remains a cleanup-only inventory tool; it is not the complete replacement installer.
 
 Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.
 
@@ -107,3 +107,13 @@ Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a 
 - [Colibri UI](https://github.com/JustVugg/colibri/blob/v2.1.0/ui/README.md), [Vulkan/dual-device backend](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/vulkan.md)
 - [Open WebUI installation](https://docs.openwebui.com/getting-started/quick-start/), [skills](https://docs.openwebui.com/features/workspace/skills/)
 - [Firefox policies](https://firefox-admin-docs.mozilla.org/reference/policies/extensionsettings/), [uBlock managed configuration](https://github.com/gorhill/uBlock/wiki/Deploying-uBlock-Origin:-configuration)
+
+## Existing Ubuntu PCs: AI migration only
+
+Do not rerun full desktop setup to replace the old AI stack. Run:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/migrate-existing-ai.sh)
+```
+
+This dedicated path provisions only the replacement AI stack, verifies it after local signup, then offers confirmed legacy cleanup. Fresh installation instead uses the import-only `finish-openwebui.sh` and never runs migration/cleanup. See [exact migration and first-use steps](docs/openwebui-linux.md#existing-pc-migration-separate-from-fresh-setup).

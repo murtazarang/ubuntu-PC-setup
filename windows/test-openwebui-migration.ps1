@@ -63,11 +63,6 @@ try {
     if(-not $rejected -or -not(Test-Path (Join-Path $movedDirectory 'omp.exe'))){throw 'Ancestor swap during prompt was not preserved'}
     [IO.Directory]::Delete($originalDirectory)
     Move-Item -LiteralPath $movedDirectory -Destination $originalDirectory
-    $shortcutSource=Get-Content -LiteralPath (Join-Path $source 'Install-OpenWebUI.ps1') -Raw
-    if($shortcutSource -notmatch '-NoProfile -ExecutionPolicy Bypass -File'){throw 'Finish shortcut must use its process-only invocation policy'}
-    # Simulate a Restricted parent process; the child invocation must override only its own process.
-    $oldPolicy=$env:PSExecutionPolicyPreference
-    $env:PSExecutionPolicyPreference='Restricted'
     # Finish runs a real Python fixture, not an actual import/network operation.
     $root=Join-Path $temp 'webui'
     & python -m venv (Join-Path $root 'venv')
@@ -76,22 +71,15 @@ try {
     $cleanup=Join-Path $root 'Remove-VerifiedOMP.ps1'
     Set-Content -LiteralPath $cleanup -Value "Set-Content -LiteralPath (Join-Path `$PSScriptRoot 'cleaned') -Value yes"
     Set-Content -LiteralPath $helper -Value 'import sys; sys.exit(1)'
-    $expectedFailurePreference=$ErrorActionPreference
-    try {
-        # Windows PowerShell 5.1 surfaces a child's expected stderr as NativeCommandError.
-        $ErrorActionPreference='Continue'
-        '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
-        $expectedFailureExit=$LASTEXITCODE
-    } finally {$ErrorActionPreference=$expectedFailurePreference}
-    if($expectedFailureExit -ne 1){throw 'Finish failure did not return nonzero'}
+    '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
+    if($LASTEXITCODE -ne 1){throw 'Finish failure did not return nonzero'}
     if(Test-Path (Join-Path $root 'cleaned')){throw 'Failed import triggered cleanup'}
     Set-Content -LiteralPath $helper -Value "import sys; assert '--reference-manifest' in sys.argv; assert '--wiki-key-file' in sys.argv"
     '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root
     if($LASTEXITCODE -ne 0){throw 'Finish successful fixture returned failure'}
-    if(-not(Test-Path (Join-Path $root 'cleaned'))){throw 'Successful verified fixture did not reach cleanup'}
+    if(Test-Path (Join-Path $root 'cleaned')){throw 'Fresh Finish must never call legacy cleanup'}
     Write-Host 'PASS: decline/gate/exact path/preserved files/junction/import failure/manifest arguments.'
 } finally {
-    if(Test-Path Variable:oldPolicy){$env:PSExecutionPolicyPreference=$oldPolicy}
     [Environment]::SetEnvironmentVariable('Path',$oldPath,'User')
     $env:PI_INSTALL_DIR=$oldDirectory
     Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue

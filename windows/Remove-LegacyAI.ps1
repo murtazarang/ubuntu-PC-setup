@@ -1,6 +1,6 @@
 # Remove the old PC-Setup inference stack, without deleting shared model libraries.
 [CmdletBinding()]
-param([switch]$Apply)
+param([switch]$Apply,[switch]$RequireRemoval,[switch]$SkipOmpConfig)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -149,6 +149,7 @@ function Invoke-LegacyCleanup {
     $apps | Select-Object DisplayName,UninstallString | Format-List | Out-Host
     Show-ExternalLocations $candidates
     if (-not $Apply) { Write-Host 'Inventory only. Run with -Apply to uninstall Paseo and permanently remove the listed app files. No files changed.'; return }
+    function Assert-LegacyNotRunning([object[]]$candidates) {
     # Refuse unknown background ownership instead of terminating arbitrary python/node processes.
     foreach ($c in $candidates) { $null = @(Get-SafeLegacyLinks $c.Path) }
     foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
@@ -163,13 +164,18 @@ function Invoke-LegacyCleanup {
             if ($service.PathName -and $service.PathName.IndexOf($c.Path,[StringComparison]::OrdinalIgnoreCase) -ge 0) { throw "Service '$($service.Name)' uses $($c.Path); retained. Stop/uninstall it through its own manager before cleanup." }
         }
     }
+    }
+    Assert-LegacyNotRunning $candidates
     if ($apps.Count -or $candidates.Count) {
         Write-Warning 'The listed runtime/download paths will be permanently deleted, including models and local settings inside them. Paseo will be uninstalled. No quarantine is created. External/shared libraries and separate chat/settings roots remain untouched.'
         if ((Read-Host 'Type DELETE to uninstall/remove exactly the listed items; anything else cancels without changes') -cne 'DELETE') {
             Write-Host 'Cancelled. No uninstall, configuration change or file deletion performed.'
+            if($RequireRemoval){throw 'Legacy removal declined; migration cleanup is incomplete.'}
             return
         }
     }
+    # Recheck after the user confirmation, immediately before any uninstall/deletion.
+    Assert-LegacyNotRunning $candidates
     $uninstalled = @{}
     foreach ($app in $apps) {
         if (-not $app.PSObject.Properties['UninstallString']) { throw 'Paseo has no registered uninstaller. Remove it in Windows Settings, then rerun.' }
@@ -182,7 +188,7 @@ function Invoke-LegacyCleanup {
         if ($p.ExitCode -notin @(0,3010)) { throw "Paseo uninstall returned $($p.ExitCode). Other app files left in place." }
     }
     if (@(Get-PaseoRegistration).Count) { throw 'Paseo is still registered; finish its uninstaller before retrying.' }
-    Remove-OldOmpProvider
+    if(-not $SkipOmpConfig){Remove-OldOmpProvider}
     Remove-StrataPathEntry
     if (-not $candidates.Count) { Write-Host 'No old runtime/download files found. Nothing to delete.'; return }
     $removed=@()
@@ -200,6 +206,7 @@ function Invoke-LegacyCleanup {
             throw "Cleanup stopped at $($c.Path), which may be partly removed. Already removed: $($removed -join '; '). Earlier uninstall/config changes may have completed. No rollback or quarantine exists. Cause: $($_.Exception.Message)"
         }
     }
+    if($RequireRemoval -and (@(Get-LegacyCandidates).Count -or @(Get-PaseoRegistration).Count)){throw 'Legacy cleanup did not verify; OMP will not be removed by migration.'}
     Write-Host 'Listed legacy runtime/download files removed. External/shared model libraries and separate chat/settings roots retained.'
 
 }

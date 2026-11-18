@@ -11,6 +11,8 @@ Open **Windows PowerShell as administrator under the account being configured**,
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/run.ps1 | iex
 ```
 
+This entry point is for a fresh installation. For an existing PC, use the [separate AI migration script](MIGRATE-AI.md); do not rerun the fresh Desktop stage to uninstall old AI software.
+
 Choose your PC and stage. The launcher downloads its companion files and locates or installs PowerShell 7 automatically. It prints the retained setup folder for recovery.
 
 | PC | Hardware argument | Assigned text model |
@@ -34,13 +36,13 @@ Substitute `NvidiaDual` or `Intel` as needed. The Desktop command also accepts `
 
 ## First use and daily controls
 
-The setup supplies four daily-use shortcuts and one migration shortcut:
+The setup supplies four daily-use shortcuts and one first-use setup shortcut:
 
 - **Colibri Serve**: starts the assigned text model in the background on `127.0.0.1:8000`.
 - **Colibri Serve Image**: starts Qwen-Image-2.1 in the background on `127.0.0.1:8001`.
 - **Stop Colibri Model**: stops only model processes recorded and still recognized by this setup.
 - **Open WebUI**: starts the local UI and Wikipedia bridge and opens the browser.
-- **Finish Open WebUI Setup**: imports/verifies skills and connections, verifies Wikipedia integrity, then offers confirmed OMP runtime removal.
+- **Finish Open WebUI Setup**: imports/verifies skills and connections and verifies Wikipedia integrity. It does not discover or remove old software.
 
 No model terminal needs to stay open. Starting text or image stops the other setup-managed model; unrelated processes are not killed. A shortcut starting successfully does **not** mean model weights have finished loading. Logs are in `%LOCALAPPDATA%\OpenWebUI-PC-Setup` (`text.log`, `image.log`, `webui.log`). The Open WebUI model picker does not load or unload Colibri weights; use the Serve/Stop shortcuts.
 
@@ -52,15 +54,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenW
 
 The execution-policy argument is process-only, not a persistent policy change. The installer repairs its exact older Finish shortcut but preserves unrelated/custom shortcuts.
 
-## Skills, Wikipedia and OMP migration
+## Skills, Wikipedia and separate existing-PC migration
 
 The three complete scientific, scientific-writer and education repositories provide **422 definitions / 3,968 original files**, including mirrored definitions. Their bytes and binary assets are imported through native Open WebUI APIs and read back; original repositories remain on disk. This does not install every optional executable tool or cloud service mentioned in the skills. A known cross-package relative reference is documented in [verification limits](../docs/openwebui-verification.md).
 
 Offline Wikipedia uses OpenZIM MCP 3.4.0 through a separately installed mcpo 0.0.20 bridge, not OMP. The June 2026 English text-only archive is about 49 GiB. Interrupted HTTP downloads retain their partial file; rerun the same stage with the same archive directory. Completed archives are checked against the publisher's SHA-256. Copying a completed archive to the same expected filename in another PC's archive directory avoids redownloading once verification succeeds.
 
-The Desktop installer itself does not delete old OMP installations. **Finish Open WebUI Setup does offer removal**, only after current skill, connection and complete-archive verification. It inventories official default/`PI_INSTALL_DIR` binaries, executable PATH entries, and recognized Bun/npm global packages. Confirmation names each program path or package; absence is checked afterward. Unknown installations stop cleanup rather than being guessed at. An unset custom install directory outside PATH cannot be discovered automatically; restore its original `PI_INSTALL_DIR` before retrying.
+Fresh Desktop setup and **Finish Open WebUI Setup** install/configure only the new stack. They do not inspect or remove legacy OMP, Paseo or Strata installations. Existing local Wikipedia can be reused after checksum verification; routine integrity and non-overwrite safeguards still protect existing files.
 
-Old skill copies, `.omp` history/configuration, source checkouts, Wikipedia, shared Bun/Node and unrelated packages remain preserved. Declining or failing cleanup is reported as incomplete, not as a completed uninstall. See [detailed first-use instructions](OPENWEBUI.md).
+For a PC with the old stack, use the [dedicated existing-PC migration](MIGRATE-AI.md):
+
+```powershell
+irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/migrate-ai.ps1 | iex
+```
+
+That separate workflow provisions only replacement AI components, verifies skills/connections/corpus, rejects overlap with protected data, then offers Paseo/Strata/XeStrata and OMP cleanup with explicit confirmation. Declining cleanup is incomplete, not success. It does not run unrelated desktop/driver/Firefox setup. Old skill copies and custom history/settings remain preserved when their safe equivalence cannot be established. See [first-use instructions](OPENWEBUI.md) for the fresh setup path.
 
 ## GPU and model behavior
 

@@ -19,7 +19,7 @@ class WindowsDocumentationTests(unittest.TestCase):
     def test_current_stack_and_cleanup_boundary(self):
         readme = (ROOT / 'windows/README.md').read_text()
         self.assertIn('Colibri inference + Open WebUI', readme)
-        self.assertIn('four daily-use shortcuts and one migration shortcut', readme)
+        self.assertIn('four daily-use shortcuts and one first-use setup shortcut', readme)
         self.assertIn('No model terminal needs to stay open', readme)
         for obsolete in ('Oh My Pi is configured', 'coli ui', 'coli web', 'exactly two', 'Connect-LocalModel.ps1'):
             self.assertNotIn(obsolete, readme)
@@ -27,7 +27,7 @@ class WindowsDocumentationTests(unittest.TestCase):
             text = (ROOT / 'windows' / name).read_text()
             self.assertIn('Finish Open WebUI Setup', text)
             self.assertIn('confirmation', text.lower())
-            self.assertIn('Bun/npm', text)
+            self.assertIn('migration', text.lower())
             self.assertIn('preserved', text)
 
     def test_direct_finish_command_matches_installer(self):
@@ -40,6 +40,10 @@ class WindowsDocumentationTests(unittest.TestCase):
         setup = (ROOT / 'windows/Setup.ps1').read_text()
         self.assertIn('-NoShortcut', setup)
         self.assertNotIn("'Install-OMP.ps1'", setup)
+        finish = (ROOT / 'windows/Finish-OpenWebUI.ps1').read_text()
+        self.assertNotIn('Remove-VerifiedOMP', finish)
+        installer = (ROOT / 'windows/Install-OpenWebUI.ps1').read_text()
+        self.assertNotIn("'Remove-VerifiedOMP.ps1'", installer)
 
 if __name__ == '__main__':
     unittest.main()

@@ -2,13 +2,13 @@
 
 The Desktop stage uses Colibri + Open WebUI, **not Oh My Pi**. Python is managed in a separate uv environment. It does not use WSL/Docker, replace drivers, configure Tailscale, or expose servers beyond localhost.
 
-1. Run the normal Desktop setup. Existing verified model downloads and Wikipedia are reused.
+1. On a fresh installation, run the normal Desktop setup. A local Wikipedia archive can be reused after checksum verification. Existing PCs use the separate migration below.
 2. Double-click **Colibri Serve** for text or **Colibri Serve Image** for pictures. The model loads in the background; a successful shortcut launch does not mean weights are ready. Loading errors are recorded in `text.log` or `image.log` in the setup directory. Starting one stops the other only if this setup recorded and still recognizes that process. An unrelated server occupying the port is left alone.
 3. Double-click **Open WebUI**. First launch can take several minutes; its log is `%LOCALAPPDATA%\OpenWebUI-PC-Setup\webui.log`. Create the first local account in the browser. No cloud account is required.
-4. Double-click **Finish Open WebUI Setup**, sign in to that local account when prompted, and wait for complete skill import, connection and Wikipedia verification. It then offers confirmed removal of recognized OMP runtime installations and verifies their absence. All three original repositories are retained on disk, including reference files and scripts. A skill definition does not by itself execute its optional tools or make cloud APIs available.
+4. Double-click **Finish Open WebUI Setup**, sign in to that local account when prompted, and wait for complete skill import and verification. All three original repositories are retained on disk, including reference files and scripts. A skill definition does not by itself execute its optional tools or make cloud APIs available.
 5. Use **Stop Colibri Model** to release RAM/VRAM. No terminal has to stay open. Choose the other Serve shortcut to switch models; the Open WebUI model picker does not load/unload Colibri weights.
 
-Full collections: K-Dense-AI scientific-agent-skills, K-Dense-AI claude-scientific-writer, GarethManning education-agent-skills. The Desktop installer does not remove OMP. The separate **Finish Open WebUI Setup** step offers runtime removal after verification and explicit confirmation. Old skill copies, custom settings/history and the corpus remain intentionally preserved even after runtime removal.
+Full collections: K-Dense-AI scientific-agent-skills, K-Dense-AI claude-scientific-writer, GarethManning education-agent-skills. Fresh setup performs no legacy discovery or cleanup. The separate existing-PC migration preserves old/custom skill copies when safe equivalence has not been established, even after verification.
 
 The Wikipedia bridge is OpenZIM MCP 3.4.0 through Open WebUI's mcpo 0.0.20. WebUI 0.13.4 runs on Python 3.11. Ports: text8000, image8001, Wikipedia8002, WebUI8080; all loopback only. The fixed data directory preserves chats/accounts across reruns. Existing desktop/runtime configuration is preserved rather than reset.
 
@@ -32,18 +32,16 @@ CUDA wheel source: https://pytorch.org/get-started/previous-versions/#v291. WebU
 
 Fresh retrieval defaults use BAAI/bge-small-en-v1.5 and cross-encoder/ms-marco-MiniLM-L6-v2, tokenizer-based 400-token chunks with 50-token overlap. Existing indexes/settings are not overwritten or reindexed. First OpenVINO export/model loading may take time. Actual B580 hardware testing remains unperformed here; the installer performs the check on the target PC.
 
-### Complete migration from an existing installation
+### Existing PCs
 
-After creating the local WebUI account, use **Finish Open WebUI Setup** or run:
+Fresh setup and its Finish shortcut only install/configure the new stack. They do not discover or uninstall old software. For an existing PC, follow [MIGRATE-AI.md](MIGRATE-AI.md) and its separate AI-only launcher, not the full Desktop stage.
+
+### Fresh first-use command
+
+The Finish shortcut only imports and configures the new stack, with no legacy discovery or removal. Alternatively run:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenWebUI-PC-Setup\Finish-OpenWebUI.ps1" -Root "$env:LOCALAPPDATA\OpenWebUI-PC-Setup"
 ```
 
-The policy argument affects only this process, not your persistent policy. The finish step verifies skill bytes, connections, and the Wikipedia archive before offering OMP removal. Official default/`PI_INSTALL_DIR` binaries and recognized Bun/npm global packages are inventoried. Confirmation names the exact program path or package; unrelated Bun packages, skill/history/configuration folders and Wikipedia remain. Unknown package-manager installations stop cleanup with their discovered path, rather than being silently left behind or guessed at. Failure returns a nonzero exit code after displaying the message.
-
-Sources: [OMP Windows binary/source installer](https://github.com/can1357/oh-my-pi/blob/main/scripts/install.ps1), [Bun package removal](https://bun.sh/docs/pm/cli/remove), [Bun pm utilities](https://bun.sh/docs/pm/cli/pm).
-
-Bun command verification: Bun 1.4.4 was exercised on Linux with an isolated temporary HOME/BUN_INSTALL and an inert, locally authored package using OMP's package name. `bun pm ls --global` emitted the `@oh-my-pi/pi-coding-agent@<resolved source>` form; `bun pm bin --global` returned the isolated bin directory. `bun remove --global @oh-my-pi/pi-coding-agent` removed its global registration while leaving the source package intact. This verifies command behavior and inventory parsing, not Windows Bun shim behavior or uninstalling a real OMP session.
-
-Exact npm global installations are also recognized using `npm root --global`, `npm prefix --global`, and `npm ls --global --depth=0 --json @oh-my-pi/pi-coding-agent`. Package metadata must match the exact name; removal uses `npm uninstall --global --ignore-scripts` followed by another inventory. On Windows, executable shims live directly in the global prefix, as documented in [npm folders](https://docs.npmjs.com/cli/v11/configuring-npm/folders/). npm 11.9.0 was exercised with an inert local package in a temporary prefix: named-package listing and uninstall worked, absence returned JSON without dependencies and exit code 1, and the source checkout remained. This was not a Windows npm test.
+The execution policy applies only to that process. Legacy cleanup and its explicit confirmation belong only to the separate migration workflow.

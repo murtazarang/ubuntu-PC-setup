@@ -13,7 +13,7 @@ Desktop files may require GNOME's **Allow Launching** once. Services belong to y
 
 ## First-use integrations
 
-After creating your account, run the installed migration command shown below under **Existing OMP migration**. It imports and verifies the three complete skill collections using the shared helper, then asks before removing recognized OMP runtimes. Do not remove old skills until that verification succeeds. Skill instructions alone do not provide a Python execution sandbox; locally installed science tools are retained, but their invocation from WebUI requires a supported tool integration. This setup does not silently grant remote shell execution.
+After creating your account on a fresh installation, run the import-only `finish-openwebui.sh` command below. It verifies the complete skill collections and Wikipedia connections without legacy discovery or cleanup. Existing PCs use the separate migration entry point. Skill instructions alone do not provide a Python execution sandbox; locally installed science tools are retained, but their invocation from WebUI requires a supported tool integration. This setup does not silently grant remote shell execution.
 
 The shared import helper configures the local connections after signing in. For inspection in Open WebUI's administrator settings:
 
@@ -45,15 +45,35 @@ journalctl --user -u pc-setup-colibri-serve -n 80
 
 PyTorch backend selection: https://docs.astral.sh/uv/guides/integration/pytorch/ (`--torch-backend cu128`).
 
-### Existing OMP migration
+### Existing-PC migration (separate from fresh setup)
 
-After setup, double-click **Open WebUI**, create your local account, then run this exact command from any terminal directory:
+Run as your logged-in Ubuntu desktop user, without sudo:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/migrate-existing-ai.sh)
+```
+
+You can append `NvidiaSingle`, `NvidiaDual`, or `Intel` if automatic hardware detection is unavailable. This dedicated path provisions only the replacement AI stack and missing AI prerequisites. It reuses or resumes Wikipedia, prepares the complete skill collections and models, starts Open WebUI, and waits for you to create/sign in to its local account. It does not run desktop/system setup, alter drivers, or install unrelated apps.
+
+Authenticated skill/connection/corpus verification must succeed before cleanup. The script then asks separately before legacy runtime/model deletion and OMP removal. Declining either leaves migration incomplete; it never claims cleanup succeeded. Active replacement data inside a legacy deletion tree blocks cleanup until deliberately relocated. Skills, user settings, conversations and Wikipedia are retained.
+
+If provisioning already completed, resume verification and cleanup from any terminal directory:
 
 ```bash
 bash "${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui/migrate-openwebui.sh"
 ```
 
-The installed migration script verifies complete skill imports, active connections and Wikipedia integrity first. It inventories default standalone OMP, the official `PI_INSTALL_DIR` override if currently set, and the official package in Bun/npm global installations. Off-PATH custom directories whose original override is no longer available cannot be discovered automatically; restore that variable before migration. Package-manager uninstall is used for linked development packages, never recursive deletion of their source checkout. Type `REMOVE OMP` to remove only the displayed runtimes. Unknown installations or changed identities stop cleanup with their exact paths; they are never silently deleted. The script verifies absence again afterward. All skill files, custom settings, chats, Wikipedia, Bun, Node and unrelated packages are retained. Close OMP before running it.
+OMP discovery covers the default standalone path, the official `PI_INSTALL_DIR` override if set, and the official package in Bun/npm global installations. Off-PATH custom directories whose override is no longer available cannot be discovered automatically; restore that variable before migration. Unknown paths stop cleanup. Linked development packages are uninstalled through their package manager, never by recursively deleting the source checkout. Close OMP before starting cleanup.
+
+### Fresh installation first use
+
+Fresh setup downloads/configures only the new stack; it does not inventory or remove legacy applications. After opening Open WebUI and creating your local account, run:
+
+```bash
+bash "${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui/finish-openwebui.sh"
+```
+
+This imports and verifies the complete skills and connections without cleanup.
 
 Sources: https://omp.sh/install, https://bun.sh/docs/pm/cli/pm, https://bun.sh/docs/pm/cli/remove, https://docs.npmjs.com/cli/v11/commands/npm-uninstall/ .
 
