@@ -13,18 +13,17 @@ In PowerShell:
 irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/remove-legacy-ai.ps1 | iex
 ```
 
-The launcher opens Paseo's registered uninstaller; leave any chat/user-data removal
-option unchecked. It moves the dedicated old Strata/XeStrata runtime trees and
-recognized leftover installer downloads into a recovery folder. It then asks you
-to type `DELETE` if you want to **permanently delete that run's quarantine** and
-free its disk space. Anything else retains the quarantine. External/custom model
-libraries are reported, not deleted, because the previous software can reuse files
-that were not downloaded by this setup. There is no reliable historical manifest
-proving ownership of those external files.
+The launcher applies cleanup, but first shows the exact discovered paths and asks
+you to type `DELETE` before permanently removing their contents. This includes
+any models and local settings stored inside the listed Strata/XeStrata directories.
+Declining the confirmation leaves those files in place. There is no new quarantine
+or delayed purge stage. Paseo is removed through its registered native uninstaller;
+the patch does not add its user-data-deletion flag.
 
 For inventory only, run `Remove-LegacyAI.ps1` without switches from a checkout.
-`-Apply` uninstalls/quarantines; `-Apply -PurgeQuarantine` also prompts for permanent
-removal. The default inventory does not modify anything.
+`-Apply` performs the confirmed uninstall and direct removal. The default inventory
+does not modify anything. Unknown/shared external model libraries are reported,
+not assumed to belong to this setup.
 
 Known destinations:
 - `%LOCALAPPDATA%\Strata` (including its own components/model files)
@@ -35,7 +34,10 @@ Known destinations:
 - Recognized `%TEMP%\xestrata-<GUID>` archive-only leftovers
 
 Custom `STRATA_*`/`PASEO_HOME`, Strata/XeStrata saved data-folder references, and
-`Documents\Strata` are printed for review. Shared Hugging Face caches are retained.
+`Documents\Strata` are printed for review. A reference inside a listed deletion root
+is included in removal; external/shared locations are retained. The local
+`Strata\app-settings.json` is part of the Strata root, not separately retained.
+Shared Hugging Face caches are retained.
 The default Strata terminal PATH entry is removed; other PATH entries are preserved.
 Paseo chat state (`.paseo`), Strata chats (`.strata`) and roaming app settings are
 retained. A customized/unrecognized Paseo uninstall command requires using Windows
@@ -45,10 +47,30 @@ The exact former setup-generated OMP `local-inference` provider and its global
 model roles are removed if they match; unrelated/customized providers and project
 settings remain. This step uses the existing OMP and uv commands. If either is
 unavailable, the script warns that settings are retained. Configuration backups
-are kept in `%LOCALAPPDATA%\PC-Setup\LegacyAI-Config-Backup`, outside the purge.
+are kept in `%LOCALAPPDATA%\PC-Setup\LegacyAI-Config-Backup`, outside the runtime deletion paths.
 
-Recovery manifests are in `%LOCALAPPDATA%\PC-Setup\LegacyAI-Quarantine\<run>\manifest.json`.
-Each record maps the original path to its quarantine destination. A `planned`
-record can mean the move was interrupted: inspect both locations before restoring.
-No automatically scheduled task or background deletion is created. Partial failure
-is reported; a stopped cleanup must not be interpreted as a complete uninstall.
+Any quarantine left by an earlier version is reported and preserved, not silently
+purged. If removal fails, the script identifies the completed and remaining paths;
+read that output before rerunning. Direct removal is not reversible and is not an
+atomic transaction. No scheduled or background deletion is created.
+
+### Registered Paseo uninstall arguments
+
+Paseo v0.16.0-beta.2 uses electron-builder 26.18.0's interactive NSIS installer.
+That upstream writes an `UninstallString` containing the executable followed by
+`/currentuser` or `/allusers`. The cleanup preserves that registered scope and
+passes it as an argument to `Start-Process`; it does not evaluate the registry
+string as shell code. Bare executable entries remain supported. Unknown options,
+compound commands and silent/data-deletion options are rejected rather than guessed.
+The patch does not add `/S` or `--delete-app-data`.
+
+Sources:
+- [Paseo packaging configuration](https://github.com/getpaseo/paseo/blob/v0.16.0-beta.2/packages/desktop/electron-builder.yml)
+- [Exact electron-builder NSIS registry command construction](https://unpkg.com/app-builder-lib@26.18.0/templates/nsis/include/installer.nsh)
+- [NSIS uninstaller data-retention behavior](https://unpkg.com/app-builder-lib@26.18.0/templates/nsis/uninstaller.nsh)
+- [PowerShell Start-Process arguments](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process)
+
+Tests cover the reported quoted path with spaces and `/currentuser`, `/allusers`,
+bare commands, rejection of extra commands/options, and execution of a harmless
+compiled Windows EXE to verify real argument delivery. They do not uninstall a
+real Paseo installation.

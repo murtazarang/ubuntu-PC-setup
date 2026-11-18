@@ -40,10 +40,10 @@ def clean_models(data):
     return True
 
 
-def clean_roles(roles):
+def clean_roles(roles, expected_selector):
     if not isinstance(roles, dict):
         raise ValueError('Global model roles are not a mapping')
-    return {k: v for k, v in roles.items() if not (isinstance(v, str) and v.startswith('local-inference/'))}
+    return {k: v for k, v in roles.items() if not (isinstance(v, str) and v == expected_selector)}
 
 
 def run(omp, *args):
@@ -64,6 +64,9 @@ def main():
     original = path.read_text(encoding='utf-8-sig')
     data = json.loads(original) if path.suffix == '.json' else yaml.safe_load(original)
     if data is None: data = {}
+    # Capture only the selector proved by the exact former provider shape.
+    provider = data.get('providers', {}).get('local-inference') if isinstance(data, dict) and isinstance(data.get('providers', {}), dict) else None
+    expected_selector = 'local-inference/' + provider['models'][0]['id'] if legacy_provider(provider) else None
     if not clean_models(data):
         print('OMP local-inference absent or customized; retained.'); return
     global_settings = json.loads(run(args.omp, 'list', '--scope', 'global', '--json'))
@@ -71,19 +74,25 @@ def main():
     record = global_settings.get('modelRoles', {'value': {}})
     if not isinstance(record, dict): raise ValueError('Invalid modelRoles record')
     roles = record.get('value', {})
-    cleaned = clean_roles(roles)
+    cleaned = clean_roles(roles, expected_selector)
     args.backup.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, args.backup / path.name)
     (args.backup / 'modelRoles.json').write_text(json.dumps(roles, indent=2), encoding='utf-8')
-    if cleaned != roles:
-        run(args.omp, 'set', 'modelRoles', json.dumps(cleaned))
     content = json.dumps(data, indent=2) + '\n' if path.suffix == '.json' else yaml.safe_dump(data, sort_keys=False)
     fd, name = tempfile.mkstemp(prefix='.models-cleanup-', dir=path.parent)
+    roles_attempted = False
     try:
+        # Stage the complete replacement before touching global settings. A
+        # permission/disk error here must leave both live configurations intact.
         with os.fdopen(fd, 'w', encoding='utf-8') as f: f.write(content)
+        if cleaned != roles:
+            roles_attempted = True
+            run(args.omp, 'set', 'modelRoles', json.dumps(cleaned))
         os.replace(name, path)
     except Exception:
-        if cleaned != roles:
+        if roles_attempted:
+            # Even a failed CLI can have partially persisted its change.
+            # Restore the saved layer; never read effective project overrides.
             run(args.omp, 'set', 'modelRoles', json.dumps(roles))
         raise
     finally:

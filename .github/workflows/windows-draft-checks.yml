@@ -109,6 +109,12 @@ jobs:
       - name: Legacy cleanup fixture (PowerShell 7)
         shell: pwsh
         run: ./windows/test-legacy-cleanup.ps1
+      - name: Paseo registered uninstall arguments (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/test-paseo-uninstall.ps1
+      - name: Paseo registered uninstall arguments (PowerShell 7)
+        shell: pwsh
+        run: ./windows/test-paseo-uninstall.ps1
       - name: Colibri native Serve shortcut (Windows PowerShell 5.1)
         shell: powershell
         run: ./windows/tests/test-colibri-serve-shortcut.ps1
