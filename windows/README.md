@@ -6,6 +6,9 @@ installation have run on Windows CI. The full desktop installation, large model
 downloads and inference have not been exercised on these three PCs. No disk
 partitioning, formatting, WSL, Btrfs or Timeshift is performed.
 
+The implementation passed [Windows and Linux CI on November 18, 2026](https://github.com/murtazarang/ubuntu-PC-setup/actions/runs/44328376158)
+at commit `4dc0671`; the subsequent change only clarifies this coverage.
+
 ## Short launcher
 
 Open Windows PowerShell as administrator, then enter:
