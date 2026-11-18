@@ -109,7 +109,9 @@ function Get-ServiceUv {
         $url = 'https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip'
         Write-Host 'Downloading the private AX206 uv prerequisite (no global installation required).'
         Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
-        $expected = ((Invoke-WebRequest ($url + '.sha256') -UseBasicParsing).Content.Trim() -split '\s+')[0]
+        $checksum = Join-Path $ToolsDirectory 'uv.zip.sha256'
+        Invoke-WebRequest ($url + '.sha256') -OutFile $checksum -UseBasicParsing
+        $expected = ((Get-Content -LiteralPath $checksum -Raw).Trim() -split '\s+')[0]
         if ($expected -notmatch '^[a-fA-F0-9]{64}$' -or (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $expected) { throw 'Official uv archive checksum verification failed; no startup was changed.' }
         Expand-Archive -LiteralPath $zip -DestinationPath $ToolsDirectory -Force
         Remove-Item -LiteralPath $zip
