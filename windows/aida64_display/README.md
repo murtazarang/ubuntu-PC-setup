@@ -75,3 +75,13 @@ Python tests cover simulated reconnects, bounded USB transfers, rotation, SCM ca
 - [Microsoft sc failure](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-failure)
 
 Python environment creation uses the protected uv-managed interpreter with [`python -m venv --copies --without-pip`](https://docs.python.org/3.11/library/venv.html). Package installation remains through `uv pip`; `uv venv --copies` is not a supported command.
+
+### Interrupted uv bootstrap
+
+If Windows or the terminal stops during extraction, the next run may report that the private uv file is not owned by SYSTEM/Administrators. The installer refuses to execute that incomplete file. In administrator PowerShell, remove only the private bootstrap tools directory, then rerun the same install or patch command:
+
+```powershell
+Remove-Item -LiteralPath "$env:ProgramFiles\AX206Panel\tools" -Recurse -Force
+```
+
+This directory contains only the private uv bootstrap, not the service interpreter, display settings, logs or drivers. Do not remove the `releases` directory or `current.json`.
