@@ -1,9 +1,10 @@
 # Native Windows PC setup
 
-**Status: draft, not yet validated on Windows.** The PowerShell and installers have
-not been run on Windows or on the specified GPUs. Do not treat the scripts as
-verified until tested. No disk partitioning, formatting, WSL, Btrfs or Timeshift
-is performed.
+**Status: Windows CI tested; full PC setup and GPU inference remain unverified.**
+PowerShell parsing, safe runtime fixtures, and the real Colibri release/dependency/UI
+installation have run on Windows CI. The full desktop installation, large model
+downloads and inference have not been exercised on these three PCs. No disk
+partitioning, formatting, WSL, Btrfs or Timeshift is performed.
 
 ## Short launcher
 
@@ -15,7 +16,7 @@ irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/r
 
 The launcher asks which PC and stage, gets the required files automatically,
 and runs that stage. Run it again after the driver step and reboot, choosing
-Desktop. It needs internet and WinGet. This is still an unverified draft. The launcher prints the retained setup folder so its recovery helpers remain accessible after execution.
+Desktop. It needs internet and WinGet. Hardware-specific operation still needs verification. The launcher prints the retained setup folder so its recovery helpers remain accessible after execution.
 
 ## Intended workflow
 
