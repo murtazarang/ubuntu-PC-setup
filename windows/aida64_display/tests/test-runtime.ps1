@@ -41,7 +41,8 @@ try {
         Initialize-ServiceRuntime -Release $release -Source $source -UvExe $uvPath
         Assert-EnvironmentRestored
         $python=Join-Path $release '.venv\Scripts\python.exe'
-        Invoke-CheckedNative $python @('-E','-s','-c','import servicemanager,win32service,win32serviceutil,ax206panel; print("Actual runtime imports passed")')
+        Invoke-CheckedNative $python @('-E','-s','-c','import servicemanager,win32service,win32serviceutil,ax206panel')
+        Write-Host 'Actual runtime imports passed'
         Assert (Test-Path (Join-Path $source 'lib\LibreHardwareMonitorLib.dll')) 'LHM extraction failed'
         foreach ($name in @('panel.py','lifecycle.py','safe_theme.py','portrait.yaml')) {Copy-Item (Join-Path $assets $name) $release}
         Invoke-CheckedNative $python @('-E','-s',(Join-Path $release 'safe_theme.py'),(Join-Path $release 'portrait.yaml'))
