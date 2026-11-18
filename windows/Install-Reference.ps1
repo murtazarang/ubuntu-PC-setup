@@ -31,8 +31,6 @@ try {
 Write-Host 'Locating Oh My Pi configuration directory.'
 $agentDir = (& $omp config path | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agentDir) { throw 'Unable to find OMP configuration directory.' }
-$paseoHome = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE '.paseo' }
-$paseoConfig = Join-Path $paseoHome 'config.json'
 $name = 'wikipedia_en_all_nopic_2026-06.zim'
 $final = Join-Path $ArchiveDirectory $name
 $part = "$final.part"
@@ -71,8 +69,8 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
     }
     Write-Host "Verified existing archive $final"
 }
-& $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --paseo-config $paseoConfig --bridge $bridge --legacy-uvx $uvx --omp $omp --zim-dir $ArchiveDirectory
-if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP and Paseo.' }
+& $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --bridge $bridge --legacy-uvx $uvx --zim-dir $ArchiveDirectory
+if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP.' }
 
 Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP and Paseo."
 

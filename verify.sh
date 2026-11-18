@@ -21,7 +21,7 @@ if command -v nvidia-smi >/dev/null; then
 fi
 for c in steam omp uv; do check "$c on PATH" command -v "$c"; done
 for app in spotify code mailspring; do check "Snap: $app" snap list "$app"; done
-check 'Paseo package' dpkg-query -W paseo
+check 'Colibri launcher' command -v coli
 if command -v flatpak >/dev/null && flatpak info --user com.stremio.Stremio >/dev/null 2>&1; then
  check 'Stremio Flatpak' flatpak info --user com.stremio.Stremio
 else
@@ -33,7 +33,7 @@ for extension in caffeine@patapon.info clipboard-history@alexsaveau.dev lightnin
 done
 check 'Oh My Pi skills' omp skill list --json
 endpoint=''
-for port in 8080 8095; do
+for port in 8000; do
  if curl -fsS --max-time 3 "http://127.0.0.1:$port/v1/models" >/dev/null; then endpoint="http://127.0.0.1:$port/v1"; break; fi
 done
 if [[ -n $endpoint ]]; then
@@ -45,5 +45,5 @@ if [[ -n $endpoint ]]; then
  fi
 else echo 'Local model is not running; start it and rerun verification.'; fail=1
 fi
-printf '\nConfirm Firefox about:policies, uBlock settings, Super+F2, Steam Proton, a real game, and OMP/Paseo tool calls interactively.\n'
+printf '\nConfirm Firefox about:policies, uBlock settings, Super+F2, Steam Proton, a real game, and OMP tool calls interactively.\n'
 exit "$fail"

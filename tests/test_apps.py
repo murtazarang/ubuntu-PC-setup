@@ -19,5 +19,5 @@ class AppsTests(unittest.TestCase):
    r=subprocess.run(['bash',str(script)],env=env,text=True,capture_output=True,timeout=15)
    self.assertEqual(r.returncode,0,r.stdout+r.stderr)
    recorded=log.read_text();self.assertIn('flatpak install --user -y flathub com.stremio.Stremio',recorded)
-   self.assertIn('apt-get -s install',recorded); self.assertIn('/paseo.deb',recorded); self.assertIn('/artcraft.deb',recorded)
+   self.assertIn('apt-get -s install',recorded); self.assertNotIn('/paseo.deb',recorded); self.assertIn('/artcraft.deb',recorded)
 if __name__=='__main__': unittest.main()

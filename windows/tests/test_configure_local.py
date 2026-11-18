@@ -35,17 +35,7 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.merge_mcp({'mcpServers': {'openzim': legacy}}, 'bridge.exe', 'wiki', 'uvx.exe')
 
-    def test_provider_preserves_other_settings(self):
-        data = {'agents': {'providers': {'omp': {'custom': True},
-                                        'other': {'enabled': True}}}}
-        m.merge_paseo(data, 'C:/omp.exe')
-        m.merge_paseo(data, 'C:/omp.exe')
-        self.assertTrue(data['agents']['providers']['omp']['custom'])
-        self.assertTrue(data['agents']['providers']['other']['enabled'])
-        with self.assertRaises(ValueError):
-            m.merge_paseo(data, 'C:/different.exe')
-
-    def test_cli_conflict_preserves_both_files(self):
+    def test_cli_does_not_touch_paseo(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             agent = root / 'agent'
@@ -58,8 +48,9 @@ class ConfigTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(P), '--agent-dir', str(agent),
                                      '--paseo-config', str(paseo), '--bridge', 'bridge.exe',
                                      '--omp', 'omp.exe', '--zim-dir', 'wiki'], capture_output=True)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual((mcp.read_bytes(), paseo.read_bytes()), before)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(paseo.read_bytes(), before[1])
+            self.assertEqual(m.read_map(mcp)["mcpServers"]["custom"], {"command": "keep"})
 
     def test_atomic_output(self):
         with tempfile.TemporaryDirectory() as d:

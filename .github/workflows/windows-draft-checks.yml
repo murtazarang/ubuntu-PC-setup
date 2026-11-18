@@ -41,9 +41,6 @@ jobs:
       - name: Execute mocked update tests
         shell: pwsh
         run: ./windows/tests/test-updates.ps1
-      - name: Execute mocked model lifecycle tests
-        shell: pwsh
-        run: ./windows/test-model-lifecycle.ps1
       - name: Execute mocked application detection tests
         shell: pwsh
         run: ./windows/test-app-detection.ps1
@@ -61,9 +58,6 @@ jobs:
       - name: Test existing OMP detection
         shell: pwsh
         run: ./windows/tests/test-omp-existing.ps1
-      - name: Test XeStrata model inventory
-        shell: pwsh
-        run: ./windows/test-xestrata-inventory.ps1
       - name: Test offline reference and desktop safety
         shell: pwsh
         run: |
@@ -102,3 +96,19 @@ jobs:
       - name: Actual AX206 runtime staging (PowerShell 7)
         shell: pwsh
         run: ./windows/aida64_display/tests/test-runtime.ps1
+      - name: Legacy cleanup fixture (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/test-legacy-cleanup.ps1
+      - name: Legacy cleanup fixture (PowerShell 7)
+        shell: pwsh
+        run: ./windows/test-legacy-cleanup.ps1
+      - name: Actual Colibri UI install and rerun (no models or GPU)
+        shell: pwsh
+        run: ./windows/tests/test-colibri-install.ps1
+
+  linux-safe-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux setup tests without installation
+        run: python3 -m unittest discover -s tests -v

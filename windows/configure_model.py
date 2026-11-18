@@ -75,7 +75,7 @@ def model_id_from_response(body):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--agent-dir", required=True, type=Path)
-    p.add_argument("--port", required=True, choices=["8080", "8095"])
+    p.add_argument("--port", required=True, choices=["8000", "8080", "8095"])
     args = p.parse_args()
     with urllib.request.urlopen(f"http://127.0.0.1:{args.port}/v1/models", timeout=10) as r:
         body = json.load(r)

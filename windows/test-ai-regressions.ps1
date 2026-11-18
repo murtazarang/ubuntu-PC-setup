@@ -32,7 +32,7 @@ try {
     Invoke-Expression $rulesBlock.Groups[1].Value
     if ($null -eq $prior -or $prior -cne '') { throw 'Missing RULES.md did not initialize an empty string.' }
 
-    foreach ($name in @('Install-OMP.ps1', 'Install-Model.ps1')) {
+    foreach ($name in @('Install-OMP.ps1')) {
         $tree = Read-SourceAst $name
         $assignment = $tree.Find({ param($node)
             $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -eq '$env:Path'
@@ -43,23 +43,7 @@ try {
         if (-not $env:Path.StartsWith('C:\process-only-tool;C:\another-tool')) { throw "$name discarded process PATH." }
     }
 
-    $model = Read-SourceAst 'Install-Model.ps1'
-    $guard = $model.Find({ param($node)
-        $node -is [System.Management.Automation.Language.IfStatementAst] -and $node.Extent.Text -match "throw 'Strata installer failed\.'" -and $node.Extent.Text -notmatch 'Invoke-WebRequest'
-    }, $true)
-    if (-not $guard) { throw 'Missing Strata installer success guard.' }
-    $installer = Join-Path $work 'fake-installer.ps1'
-    Set-Content -LiteralPath $installer -Value '$global:LASTEXITCODE = 17; Write-Output "simulated successful fallback"'
-    $invoke = [scriptblock]::Create('& $installer' + "`n" + $guard.Extent.Text)
-    & $invoke | Out-Null
-    Set-Content -LiteralPath $installer -Value 'throw "simulated installer failure"'
-    try {
-        & $invoke | Out-Null
-        throw 'Failure was not propagated.'
-    } catch {
-        if ($_.Exception.Message -ne 'simulated installer failure') { throw }
-    }
-    Write-Host 'AI regression tests passed: empty rules, process PATH, and successful installer with stale native exit. No external software ran.'
+    Write-Host 'AI regression tests passed: empty rules and process PATH.'
 } finally {
     $env:Path = $originalPath
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

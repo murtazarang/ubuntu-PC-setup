@@ -35,7 +35,7 @@ Run in a **logged-in GNOME desktop session**:
 ./setup.sh desktop
 ```
 
-This tries the linked Stremio deb and uses the approved, officially listed Stremio Flatpak if its dependencies cannot resolve; it installs the linked Paseo package, ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; removes Thunderbird after Mailspring installation; installs local writing/science tools using `uv`; installs the three GNOME extensions and Super+F2 launcher shortcut; configures Firefox extensions and uBlock; clones both complete skills packages; enables Paseo's built-in OMP provider; and configures the appropriate local model. First model download can be 58–76 GB or more and will take time. OMP defaults to the local model without requiring a K-Dense or Anthropic account; its other providers remain available if you choose to configure them later. Some bundled skills describe services that are unavailable offline; the full skills remain present and the global OMP rule directs it to local methods.
+This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs Colibri's built-in browser UI. It no longer installs Paseo, Strata or XeStrata. No model is downloaded by the setup. OMP's other providers remain available.
 
 ### Offline educational reference
 
@@ -48,9 +48,28 @@ The desktop stage registers the complete Education Agent Skills portable release
 This downloads the English full-text June 2026 Wikipedia snapshot without pictures to `~/.local/share/kiwix-mcp/archives`. An interrupted download can be resumed. To use a different location, set `KIWIX_ARCHIVE_DIR` to the same directory when running both `./configure-kiwix.sh` and `./download-wikipedia.sh`. Restart Oh My Pi after configuration. Ask it to search the Kiwix archive and cite the article. The archive is a dated snapshot and source lookup does not guarantee that a model's answer is correct. Textbook PDF search is not included. No cloud account is needed for the bridge.
 
 
-Models: one NVIDIA GPU → Qwen3.8-Flash-Next IQ2_XS; two NVIDIA GPUs → IQ3_XXS with one main and one helper; Intel GPU → XeStrata Gyro-S. The Intel render group change requires logging out and in, then rerunning the desktop stage. For XeStrata, a user service starts the model for setup but is not enabled at login. Stop it when gaming with `systemctl --user stop xestrata`; start with `systemctl --user start xestrata`. NVIDIA Strata provides `strata launch --status` and `strata launch --stop`. If the model is still loading when the setup times out, run `./connect-xestrata.sh 8095` once it is ready.
+### Colibri on the three Ubuntu PCs
 
-Paseo uses the requested `0.16.0-beta.2`, not an automatically selected stable substitute. Restart it after setup. Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.
+All three use the official Colibri v2.1.0 Linux CPU+Vulkan release, verified with its release SHA-256. No CUDA toolkit/source build is required. Existing proprietary NVIDIA or Intel Mesa/Vulkan drivers must already work (`vulkaninfo --summary`).
+
+- RTX 3080: one Vulkan device, `COLI_VULKAN=1`.
+- Two RTX 3060s: additionally `COLI_VK_DEV2=auto`, the upstream second-device expert tier. This is not a promise of 24 GB contiguous memory or measured speedup; model support, budgets and actual use of both GPUs must be verified. Upstream documents that its second-device tests do not establish performance on two real GPUs.
+- Intel Arc B580: Vulkan selects a preferred discrete GPU. Check the startup log names the B580 rather than the CPU/iGPU.
+
+Run the native `coli ui --models-dir "$HOME/colibri-models"` command. The Models page can download catalog models and compatible Hugging Face GGUFs into `~/colibri-models`. Once downloaded, start the first model in another terminal:
+
+```bash
+COLI_VULKAN=1 COLI_NO_OMP_TUNE=1 coli serve --model /absolute/path/to/downloaded/model
+./connect-colibri.sh       # point OMP at the running model on port 8000
+```
+
+For the dual RTX 3060 PC, prefix both `coli ui` and `coli serve` commands with `COLI_VULKAN=1 COLI_VK_DEV2=auto COLI_NO_OMP_TUNE=1`. For the single RTX 3080 and Arc B580, use `COLI_VULKAN=1 COLI_NO_OMP_TUNE=1`. These are upstream environment settings, not a separate launcher.
+
+The UI is at `http://127.0.0.1:8790`, inference API at `http://127.0.0.1:8000/v1`. Linux UI **Use** switches an already-running gateway, preserving its environment; if switching model, rerun the OMP connection helper to refresh the model ID. A UI without an engine is sufficient for downloads, not chat. Keep these foreground terminals open; Ctrl+C stops them. No autostart service is added. Use upstream `--models-dir DIR` to select a different download folder. This installs the built-in UI, not the separate Tauri shell.
+
+For an existing setup, first preview `./remove-legacy-ai.sh`; use `./remove-legacy-ai.sh --apply` to confirm app removal and archive known data/config directories. Shared packages, OMP/skills/Wikipedia and external models are preserved. Inspect its backup manifest before permanently deleting anything. Then run `./configure-ai.sh`. The obsolete `connect-xestrata.sh` is replaced by `connect-colibri.sh`.
+
+Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.
 
 ### Firefox configuration
 
@@ -81,13 +100,13 @@ It creates one partition and mounts it at `/mnt/storage` using a UUID. The choic
 python3 -m unittest discover -s tests -v
 ```
 
-Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, OMP's ability to call a local tool, and Paseo's OMP provider on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
+Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, OMP's ability to call a local tool, and the Colibri UI on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
 
 ## Sources and verification
 
 - [Ubuntu installer storage](https://canonical-subiquity.readthedocs-hosted.com/en/latest/howto/configure-storage.html)
 - [Ubuntu NVIDIA drivers](https://ubuntu.com/server/docs/nvidia-drivers-installation/)
 - [Timeshift](https://github.com/linuxmint/timeshift)
-- [Strata](https://github.com/Niko1221/Strata/blob/main/docs/INSTALL.md), [XeStrata](https://github.com/MistVVK/XeStrata)
-- [Oh My Pi skills](https://github.com/can1357/oh-my-pi/blob/main/docs/skills.md), [Paseo 0.16.0-beta.2](https://github.com/getpaseo/paseo/tree/v0.16.0-beta.2)
+- [Colibri UI](https://github.com/JustVugg/colibri/blob/v2.1.0/ui/README.md), [Vulkan/dual-device backend](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/vulkan.md)
+- [Oh My Pi skills](https://github.com/can1357/oh-my-pi/blob/main/docs/skills.md)
 - [Firefox policies](https://firefox-admin-docs.mozilla.org/reference/policies/extensionsettings/), [uBlock managed configuration](https://github.com/gorhill/uBlock/wiki/Deploying-uBlock-Origin:-configuration)

@@ -1,6 +1,6 @@
-# Connect OMP to an already running Strata or XeStrata endpoint.
+# Connect OMP to an already running Colibri endpoint.
 [CmdletBinding()]
-param([ValidateSet('8080', '8095')][string]$Port = '8080')
+param([ValidateSet('8000','8080','8095')][string]$Port = '8000')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $omp = (Get-Command omp.exe -CommandType Application -ErrorAction Stop).Source

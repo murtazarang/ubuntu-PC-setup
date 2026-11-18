@@ -26,7 +26,6 @@ else
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
   flatpak install --user -y flathub com.stremio.Stremio
 fi
-fetch_deb 'https://github.com/getpaseo/paseo/releases/download/v0.16.0-beta.2/Paseo-0.16.0-beta.2-amd64.deb' paseo.deb
 # ArtCraft Studio's official latest Linux x86_64 .deb.
 art_url=$(curl -fsSL https://api.github.com/repos/storytold/artcraft/releases/latest | jq -er '[.assets[] | select(.name | test("^artcraft-[0-9].*-linux-x86_64\\.deb$")) | .browser_download_url] | if length == 1 then .[0] else error("Expected one ArtCraft amd64 deb") end')
 fetch_deb "$art_url" artcraft.deb

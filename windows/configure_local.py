@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Prepare native Oh My Pi/Paseo JSON settings without disturbing other entries.
+"""Prepare native Oh My Pi JSON settings without disturbing other entries.
 
-Only Kiwix MCP and Paseo provider are configured here. Installers and inference
+Only OpenZIM MCP is configured here. Installers and inference
 startup are deliberately handled elsewhere. Never enables cloud model providers.
 """
 import argparse
@@ -48,35 +48,19 @@ def merge_mcp(data, bridge, zim_dir, legacy_uvx=None):
     return data
 
 
-def merge_paseo(data, omp):
-    agents = data.setdefault("agents", {})
-    providers = agents.setdefault("providers", {})
-    provider = providers.setdefault("omp", {})
-    if not isinstance(provider, dict):
-        raise ValueError("Paseo OMP provider must be an object")
-    command = [str(omp)]
-    if "command" in provider and provider["command"] != command:
-        raise ValueError("Existing Paseo OMP command differs; no changes made")
-    provider["enabled"] = True
-    provider["command"] = command
-    return data
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent-dir", required=True, type=Path)
-    parser.add_argument("--paseo-config", required=True, type=Path)
+    parser.add_argument("--paseo-config", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--bridge", required=True, type=Path)
     parser.add_argument("--legacy-uvx", type=Path)
-    parser.add_argument("--omp", required=True, type=Path)
+    parser.add_argument("--omp", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--zim-dir", required=True, type=Path)
     args = parser.parse_args()
-    # Validate both merges before writing either file.
+    # Only register OpenZIM; never edit legacy Paseo settings.
     mcp_path = args.agent_dir / "mcp.json"
     mcp = merge_mcp(read_map(mcp_path), args.bridge, args.zim_dir, args.legacy_uvx)
-    paseo = merge_paseo(read_map(args.paseo_config), args.omp)
     atomic_json(mcp_path, mcp)
-    atomic_json(args.paseo_config, paseo)
 
 
 if __name__ == "__main__":

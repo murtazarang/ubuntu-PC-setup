@@ -40,7 +40,7 @@ class LocalModelConnectionTests(unittest.TestCase):
        self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"data":[{"id":"example-local"}]}')
       def log_message(self,*args): pass
     class Server(socketserver.TCPServer): allow_reuse_address=True
-    try: server=Server(('127.0.0.1',8095),Handler)
+    try: server=Server(('127.0.0.1',8000),Handler)
     except OSError as exc: self.skipTest(f'Cannot bind loopback in this sandbox: {exc}')
     thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
     try:
@@ -49,10 +49,10 @@ class LocalModelConnectionTests(unittest.TestCase):
       omp=home/'.local/bin/omp'; omp.write_text('''#!/bin/sh\nif [ "$1 $2" = "config path" ]; then echo "$HOME/.omp/agent"; elif [ "$1 $2" = "config get" ]; then echo '{"value":{}}'; elif [ "$1 $2" = "config set" ]; then printf '%s\\n' "$*" >> "$HOME/calls"; else exit 2; fi\n'''); omp.chmod(0o755)
       (home/'.omp/agent/models.yml').write_text('providers:\n  old-provider:\n    baseUrl: http://example.invalid\n')
       env=os.environ|{'HOME':td,'no_proxy':'127.0.0.1,localhost','NO_PROXY':'127.0.0.1,localhost'}
-      r=subprocess.run(['bash',str(ROOT/'connect-xestrata.sh'),'8095'],env=env,text=True,capture_output=True)
+      r=subprocess.run(['bash',str(ROOT/'connect-colibri.sh'),'8000'],env=env,text=True,capture_output=True)
       self.assertEqual(r.returncode,0,r.stderr)
-      content=(home/'.omp/agent/models.yml').read_text(); self.assertIn('old-provider',content); self.assertIn('http://127.0.0.1:8095/v1',content); self.assertIn('example-local',content)
-      calls=(home/'calls').read_text(); self.assertIn('modelRoles',calls); self.assertNotIn('enabledModels',calls); self.assertIn('local-inference/example-local',calls)
+      content=(home/'.omp/agent/models.yml').read_text(); self.assertIn('old-provider',content); self.assertIn('http://127.0.0.1:8000/v1',content); self.assertIn('example-local',content)
+      calls=(home/'calls').read_text(); self.assertIn('modelRoles',calls); self.assertNotIn('enabledModels',calls); self.assertIn('pc-setup-colibri/example-local',calls)
     finally:
      server.shutdown(); server.server_close(); thread.join()
 

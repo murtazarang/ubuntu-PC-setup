@@ -41,5 +41,5 @@ $env:Path = $pathEntries -join ';'
 & (Join-Path $PSScriptRoot 'Install-Skills.ps1')
 & (Join-Path $PSScriptRoot 'Configure-Firefox.ps1')
 & (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
-& (Join-Path $PSScriptRoot 'Install-Model.ps1') -Hardware $Hardware
+& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware
 Write-Host 'Desktop stages finished. Read the Windows README for first-run and verification.'
