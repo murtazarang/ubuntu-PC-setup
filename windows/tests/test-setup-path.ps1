@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $setup = Join-Path (Split-Path $PSScriptRoot -Parent) 'Setup.ps1'
 $source = Get-Content -LiteralPath $setup -Raw
 $start = $source.IndexOf('# Refresh persisted paths')
-$end = $source.IndexOf("& (Join-Path `$PSScriptRoot 'Install-OMP.ps1')", $start)
+$end = $source.IndexOf('# End persisted PATH merge', $start)
 if ($start -lt 0 -or $end -le $start) { throw 'PATH merge block not found.' }
 $merge = [scriptblock]::Create($source.Substring($start, $end - $start))
 $originalPath = $env:Path

@@ -36,6 +36,7 @@ foreach ($pathSource in @(
     }
 }
 $env:Path = $pathEntries -join ';'
+# End persisted PATH merge
 & (Join-Path $PSScriptRoot 'Configure-Desktop.ps1')
 & (Join-Path $PSScriptRoot 'Configure-Firefox.ps1')
 & (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
