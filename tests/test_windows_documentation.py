@@ -1,0 +1,45 @@
+"""Guard the Windows user instructions against obsolete AI workflow claims."""
+from pathlib import Path
+import re
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+class WindowsDocumentationTests(unittest.TestCase):
+    def test_every_installed_shortcut_is_documented(self):
+        installer = (ROOT / 'windows/Install-OpenWebUI.ps1').read_text()
+        names = re.findall(r"@\{name='([^']+)'", installer)
+        self.assertEqual(len(names), 4)
+        names.append('Finish Open WebUI Setup')
+        for document in ('README.md', 'OPENWEBUI.md'):
+            text = (ROOT / 'windows' / document).read_text()
+            for name in names:
+                self.assertIn(f'**{name}**', text)
+
+    def test_current_stack_and_cleanup_boundary(self):
+        readme = (ROOT / 'windows/README.md').read_text()
+        self.assertIn('Colibri inference + Open WebUI', readme)
+        self.assertIn('four daily-use shortcuts and one migration shortcut', readme)
+        self.assertIn('No model terminal needs to stay open', readme)
+        for obsolete in ('Oh My Pi is configured', 'coli ui', 'coli web', 'exactly two', 'Connect-LocalModel.ps1'):
+            self.assertNotIn(obsolete, readme)
+        for name in ('README.md', 'OPENWEBUI.md'):
+            text = (ROOT / 'windows' / name).read_text()
+            self.assertIn('Finish Open WebUI Setup', text)
+            self.assertIn('confirmation', text.lower())
+            self.assertIn('Bun/npm', text)
+            self.assertIn('preserved', text)
+
+    def test_direct_finish_command_matches_installer(self):
+        command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\\OpenWebUI-PC-Setup\\Finish-OpenWebUI.ps1" -Root "$env:LOCALAPPDATA\\OpenWebUI-PC-Setup"'
+        for name in ('README.md', 'OPENWEBUI.md'):
+            self.assertIn(command, (ROOT / 'windows' / name).read_text())
+        installer = (ROOT / 'windows/Install-OpenWebUI.ps1').read_text()
+        self.assertIn('-NoProfile -ExecutionPolicy Bypass -File', installer)
+        self.assertIn('Finish-OpenWebUI.ps1', installer)
+        setup = (ROOT / 'windows/Setup.ps1').read_text()
+        self.assertIn('-NoShortcut', setup)
+        self.assertNotIn("'Install-OMP.ps1'", setup)
+
+if __name__ == '__main__':
+    unittest.main()
