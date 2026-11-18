@@ -77,6 +77,7 @@ PACKAGE_FILES="$package_files" python3 - "${paths[@]}" <<'PY'
 import os,pathlib,sys
 roots=[str(pathlib.Path(x).absolute()) for x in sys.argv[1:]]
 package_files=set(os.environ['PACKAGE_FILES'].splitlines())
+unreadable=[]
 for proc in pathlib.Path('/proc').glob('[0-9]*'):
  try:
   if proc.stat().st_uid!=os.getuid() or int(proc.name)==os.getpid():continue
@@ -84,9 +85,19 @@ for proc in pathlib.Path('/proc').glob('[0-9]*'):
   executable=os.readlink(proc/'exe').removesuffix(' (deleted)')
  except (FileNotFoundError,ProcessLookupError):continue
  except OSError as exc:
-  raise SystemExit('Cannot inspect process '+proc.name+' safely; no deletion performed: '+str(exc))
+  details=[]
+  for name in ('comm','status','cmdline'):
+   try:
+    text=(proc/name).read_text().replace('\x00',' ')
+    if name=='status':text='; '.join(line for line in text.splitlines() if line.startswith(('Name:','State:','Uid:','Gid:','TracerPid:','NoNewPrivs:')))
+    details.append(name+'='+text[:1000].strip())
+   except OSError as detail_error:details.append(name+' unreadable: '+str(detail_error))
+  unreadable.append('PID '+proc.name+': '+str(exc)+' | '+' | '.join(details))
+  continue
  if executable in package_files or any(executable==root or executable.startswith(root+'/') for root in roots) or any(arg==root or arg.startswith(root+'/') for arg in args for root in roots):
   raise SystemExit('A legacy runtime is still running (PID '+proc.name+'). Close it and rerun; nothing was forcibly killed.')
+if unreadable:
+ raise SystemExit('Cannot safely inspect all current-user processes; no deletion performed.\n'+'\n'.join(unreadable))
 PY
 if (( ${#packages[@]} )); then sudo apt-get remove "${packages[@]}"; fi
 check_paths
