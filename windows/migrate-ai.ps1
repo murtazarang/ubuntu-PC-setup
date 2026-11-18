@@ -39,7 +39,7 @@ try{
     $archive=Join-Path $dir 'setup.zip'
     Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive
     Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $dir 'files')
-    $script=Join-Path $dir 'files\ubuntu-PC-setup-main\windows\Migrate-AI.ps1'
+    $script=Join-Path $dir 'files\ubuntu-PC-setup-main\windows\Migrate-ExistingAI.ps1'
     if(-not(Test-Path -LiteralPath $script -PathType Leaf)){throw 'Downloaded package lacks the AI-only migration script.'}
     $arguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$script,'-Hardware',$Hardware)
     if($ArchiveDirectory){$arguments+=@('-ArchiveDirectory',$ArchiveDirectory)}

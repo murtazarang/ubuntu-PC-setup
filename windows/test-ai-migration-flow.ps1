@@ -1,6 +1,6 @@
 # Executes the real orchestration block with inert helper files and real Python fixtures.
 $ErrorActionPreference='Stop'
-$text=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Migrate-AI.ps1') -Raw
+$text=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Migrate-ExistingAI.ps1') -Raw
 $start=$text.IndexOf('# BEGIN migration stages');$end=$text.IndexOf('# END migration stages')
 if($start -lt 0 -or $end -le $start){throw 'Migration stage markers missing'}
 $block=$text.Substring($start,$end-$start)

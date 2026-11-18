@@ -1,11 +1,20 @@
 """Guard the Windows user instructions against obsolete AI workflow claims."""
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
 class WindowsDocumentationTests(unittest.TestCase):
+    def test_repository_paths_do_not_collide_on_windows(self):
+        paths = subprocess.check_output(['git', 'ls-files'], cwd=ROOT, text=True).splitlines()
+        folded = {}
+        for path in paths:
+            key = path.casefold()
+            self.assertNotIn(key, folded, f'Windows filename collision: {folded.get(key)} / {path}')
+            folded[key] = path
+
     def test_every_installed_shortcut_is_documented(self):
         installer = (ROOT / 'windows/Install-OpenWebUI.ps1').read_text()
         names = re.findall(r"@\{name='([^']+)'", installer)
