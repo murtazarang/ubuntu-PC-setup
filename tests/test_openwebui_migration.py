@@ -3,7 +3,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 class Migration(unittest.TestCase):
  def fixture(self,code,answer):
   with tempfile.TemporaryDirectory() as t:
-   p=pathlib.Path(t);src=p/'src';src.mkdir();shutil.copy(ROOT/'migrate-openwebui.sh',src)
+   p=pathlib.Path(t);src=p/'src';src.mkdir();shutil.copy(ROOT/'migrate-openwebui.sh',src);shutil.copy(ROOT/'remove-omp-runtime.py',src)
    (src/'openwebui_skills.py').write_text('import sys; assert \"--reference-manifest\" in sys.argv; raise SystemExit('+str(code)+')')
    home=p/'home';target=home/'.local/bin/omp';target.parent.mkdir(parents=True);target.write_text('executable')
    custom=home/'.omp/skills/custom';custom.mkdir(parents=True);(custom/'SKILL.md').write_text('keep')
@@ -11,11 +11,11 @@ class Migration(unittest.TestCase):
    r=subprocess.run(['bash',str(src/'migrate-openwebui.sh')],env=os.environ|{'HOME':str(home),'PATH':str(bin)+':'+os.environ['PATH']},input=answer,text=True,capture_output=True)
    return r.returncode,target.exists(),(custom/'SKILL.md').read_text()
  def test_failed_verification_preserves_binary(self):self.assertEqual(self.fixture(1,'REMOVE OMP\n'),(1,True,'keep'))
- def test_decline_preserves_binary(self):self.assertEqual(self.fixture(0,'no\n'),(0,True,'keep'))
+ def test_decline_preserves_binary(self):self.assertEqual(self.fixture(0,'no\n'),(1,True,'keep'))
  def test_verified_explicit_removal_preserves_skills(self):self.assertEqual(self.fixture(0,'REMOVE OMP\n'),(0,False,'keep'))
  def test_changed_executable_after_prompt_is_retained(self):
   with tempfile.TemporaryDirectory() as t:
-   p=pathlib.Path(t);src=p/'src';src.mkdir();shutil.copy(ROOT/'migrate-openwebui.sh',src)
+   p=pathlib.Path(t);src=p/'src';src.mkdir();shutil.copy(ROOT/'migrate-openwebui.sh',src);shutil.copy(ROOT/'remove-omp-runtime.py',src)
    (src/'openwebui_skills.py').write_text('raise SystemExit(0)')
    target=p/'home/.local/bin/omp';target.parent.mkdir(parents=True);target.write_text('old')
    bindir=p/'bin';bindir.mkdir();pgrep=bindir/'pgrep';pgrep.write_text('#!/bin/sh\nexit 1\n');pgrep.chmod(0o755)

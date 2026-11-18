@@ -17,14 +17,14 @@ try {
     $keep=Join-Path $env:PI_INSTALL_DIR 'custom-skill.txt'
     Set-Content -LiteralPath $keep -Value 'must survive'
     $global:WebUIMigrationFixtureState.Answer=''
-    & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
+    & (Join-Path $source 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun
     if(-not(Test-Path $exe)){throw 'Decline incorrectly removed OMP'}
     $rejected=$false
-    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') } catch {$rejected=$true}
+    try { & (Join-Path $source 'Remove-OMPBinary.ps1') } catch {$rejected=$true}
     if(-not $rejected){throw 'Missing verification gate was accepted'}
     [Environment]::SetEnvironmentVariable('Path',($oldPath+';'+$env:PI_INSTALL_DIR+';'+$env:PI_INSTALL_DIR+'-unrelated'),'User')
-    $global:WebUIMigrationFixtureState.Answer='DELETE'
-    & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun
+    $global:WebUIMigrationFixtureState.Answer=$exe
+    & (Join-Path $source 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun
     if(Test-Path $exe){throw 'Confirmed fake OMP file not removed'}
     if(-not(Test-Path $keep)){throw 'Unrelated file removed'}
     $after=[Environment]::GetEnvironmentVariable('Path','User') -split ';'
@@ -38,7 +38,7 @@ try {
         (Get-Item -LiteralPath $exe).LastWriteTimeUtc=$stamp
     }.GetNewClosure()
     $rejected=$false
-    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
+    try { & (Join-Path $source 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
     $global:WebUIMigrationFixtureState.Action=$null
     if(-not $rejected -or -not(Test-Path $exe)){throw 'Same-size/mtime replacement was not preserved'}
     # Junction path is deliberately rejected even with confirmation.
@@ -47,7 +47,7 @@ try {
     Set-Content -LiteralPath $exe -Value 'fake'
     $env:PI_INSTALL_DIR=$linked
     $rejected=$false
-    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
+    try { & (Join-Path $source 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
     if(-not $rejected -or -not(Test-Path $exe)){throw 'Linked target guard failed'}
     [IO.Directory]::Delete($linked)
     $env:PI_INSTALL_DIR=Join-Path $temp 'omp'
@@ -58,11 +58,16 @@ try {
         New-Item -ItemType Junction -Path $originalDirectory -Target $movedDirectory|Out-Null
     }.GetNewClosure()
     $rejected=$false
-    try { & (Join-Path $source 'Remove-VerifiedOMP.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
+    try { & (Join-Path $source 'Remove-OMPBinary.ps1') -MigrationVerifiedThisRun } catch {$rejected=$true}
     $global:WebUIMigrationFixtureState.Action=$null
     if(-not $rejected -or -not(Test-Path (Join-Path $movedDirectory 'omp.exe'))){throw 'Ancestor swap during prompt was not preserved'}
     [IO.Directory]::Delete($originalDirectory)
     Move-Item -LiteralPath $movedDirectory -Destination $originalDirectory
+    $shortcutSource=Get-Content -LiteralPath (Join-Path $source 'Install-OpenWebUI.ps1') -Raw
+    if($shortcutSource -notmatch '-NoProfile -ExecutionPolicy Bypass -File'){throw 'Finish shortcut must use its process-only invocation policy'}
+    # Simulate a Restricted parent process; the child invocation must override only its own process.
+    $oldPolicy=$env:PSExecutionPolicyPreference
+    $env:PSExecutionPolicyPreference='Restricted'
     # Finish runs a real Python fixture, not an actual import/network operation.
     $root=Join-Path $temp 'webui'
     & python -m venv (Join-Path $root 'venv')
@@ -71,13 +76,16 @@ try {
     $cleanup=Join-Path $root 'Remove-VerifiedOMP.ps1'
     Set-Content -LiteralPath $cleanup -Value "Set-Content -LiteralPath (Join-Path `$PSScriptRoot 'cleaned') -Value yes"
     Set-Content -LiteralPath $helper -Value 'import sys; sys.exit(1)'
-    & (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
+    '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
+    if($LASTEXITCODE -ne 1){throw 'Finish failure did not return nonzero'}
     if(Test-Path (Join-Path $root 'cleaned')){throw 'Failed import triggered cleanup'}
     Set-Content -LiteralPath $helper -Value "import sys; assert '--reference-manifest' in sys.argv; assert '--wiki-key-file' in sys.argv"
-    & (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root
+    '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root
+    if($LASTEXITCODE -ne 0){throw 'Finish successful fixture returned failure'}
     if(-not(Test-Path (Join-Path $root 'cleaned'))){throw 'Successful verified fixture did not reach cleanup'}
     Write-Host 'PASS: decline/gate/exact path/preserved files/junction/import failure/manifest arguments.'
 } finally {
+    if(Test-Path Variable:oldPolicy){$env:PSExecutionPolicyPreference=$oldPolicy}
     [Environment]::SetEnvironmentVariable('Path',$oldPath,'User')
     $env:PI_INSTALL_DIR=$oldDirectory
     Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue

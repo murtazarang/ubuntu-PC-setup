@@ -45,5 +45,5 @@ if [[ -n $endpoint ]]; then
  fi
 else echo 'Local model is not running; start it and rerun verification.'; fail=1
 fi
-printf '\nConfirm Firefox about:policies, uBlock settings, Super+F2, Steam Proton, a real game, and OMP tool calls interactively.\n'
+printf '\nConfirm Firefox about:policies, uBlock settings, Super+F2, Steam Proton, a real game, and Open WebUI Wikipedia tool calls interactively.\n'
 exit "$fail"

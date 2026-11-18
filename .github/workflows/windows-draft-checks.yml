@@ -31,6 +31,16 @@ jobs:
       - name: Open WebUI migration fixtures (PowerShell 7)
         shell: pwsh
         run: ./windows/test-openwebui-migration.ps1
+      - name: OMP package discovery and uninstall fixtures (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          ./windows/test-omp-discovery.ps1
+          ./windows/test-openwebui-shortcut.ps1
+      - name: OMP package discovery and uninstall fixtures (PowerShell 7)
+        shell: pwsh
+        run: |
+          ./windows/test-omp-discovery.ps1
+          ./windows/test-openwebui-shortcut.ps1
       - name: Open WebUI lifecycle safe fixtures
         shell: pwsh
         run: uv run --no-project --with psutil==7.2.2 python windows/test_openwebui_desktop.py

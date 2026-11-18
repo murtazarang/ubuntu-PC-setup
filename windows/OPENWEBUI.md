@@ -31,3 +31,19 @@ NVIDIA GPU supporting models are approved; PyTorch 2.9.1 CUDA 12.8 wheels are se
 CUDA wheel source: https://pytorch.org/get-started/previous-versions/#v291. WebUI supporting PyTorch models use CUDA; this is not evidence that Whisper CTranslate2 or every optional tool can use the GPU. Their additional CUDA/cuDNN dependencies and hardware behavior need separate validation.
 
 Fresh retrieval defaults use BAAI/bge-small-en-v1.5 and cross-encoder/ms-marco-MiniLM-L6-v2, tokenizer-based 400-token chunks with 50-token overlap. Existing indexes/settings are not overwritten or reindexed. First OpenVINO export/model loading may take time. Actual B580 hardware testing remains unperformed here; the installer performs the check on the target PC.
+
+### Complete migration from an existing installation
+
+After creating the local WebUI account, use **Finish Open WebUI Setup** or run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenWebUI-PC-Setup\Finish-OpenWebUI.ps1" -Root "$env:LOCALAPPDATA\OpenWebUI-PC-Setup"
+```
+
+The policy argument affects only this process, not your persistent policy. The finish step verifies skill bytes, connections, and the Wikipedia archive before offering OMP removal. Official default/`PI_INSTALL_DIR` binaries and the official Bun global package are inventoried. Confirmation names the exact program path or package; unrelated Bun packages, skill/history/configuration folders and Wikipedia remain. Unknown package-manager installations stop cleanup with their discovered path, rather than being silently left behind or guessed at. Failure returns a nonzero exit code after displaying the message.
+
+Sources: [OMP Windows binary/source installer](https://github.com/can1357/oh-my-pi/blob/main/scripts/install.ps1), [Bun package removal](https://bun.sh/docs/pm/cli/remove), [Bun pm utilities](https://bun.sh/docs/pm/cli/pm).
+
+Bun command verification: Bun 1.4.4 was exercised on Linux with an isolated temporary HOME/BUN_INSTALL and an inert, locally authored package using OMP's package name. `bun pm ls --global` emitted the `@oh-my-pi/pi-coding-agent@<resolved source>` form; `bun pm bin --global` returned the isolated bin directory. `bun remove --global @oh-my-pi/pi-coding-agent` removed its global registration while leaving the source package intact. This verifies command behavior and inventory parsing, not Windows Bun shim behavior or uninstalling a real OMP session.
+
+Exact npm global installations are also recognized using `npm root --global`, `npm prefix --global`, and `npm ls --global --depth=0 --json @oh-my-pi/pi-coding-agent`. Package metadata must match the exact name; removal uses `npm uninstall --global --ignore-scripts` followed by another inventory. On Windows, executable shims live directly in the global prefix, as documented in [npm folders](https://docs.npmjs.com/cli/v11/configuring-npm/folders/). npm 11.9.0 was exercised with an inert local package in a temporary prefix: named-package listing and uninstall worked, absence returned JSON without dependencies and exit code 1, and the source checkout remained. This was not a Windows npm test.

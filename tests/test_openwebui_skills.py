@@ -45,6 +45,11 @@ class Tests(unittest.TestCase):
     subprocess.run(['git','-C',str(repo),'add','.'],check=True);subprocess.run(['git','-C',str(repo),'-c','user.name=Test','-c','user.email=t@example.com','commit','-m','fixture'],capture_output=True,check=True)
    with patch.object(s,'REPOS',repos):p=s.inventory(root)
    self.assertEqual(set(p[0]['meta']),{'tags','i18n'});self.assertEqual(len(p),2);self.assertNotEqual(p[0]['id'],p[1]['id']);self.assertNotEqual(p[0]['name'],p[1]['name']);self.assertEqual(len(p[0]['files']),3)
+   revisions={name:s.git('-C',root/name,'rev-parse','HEAD') for name in repos}
+   with patch.object(s,'REPOS',repos),patch.object(s,'REVISIONS',revisions),self.assertRaisesRegex(ValueError,'422 definitions'):s.inventory(root)
+   subprocess.run(['git','-C',str(root/'a'),'config','core.sparseCheckout','true'],check=True)
+   with patch.object(s,'REPOS',repos),self.assertRaisesRegex(ValueError,'Sparse checkout'):s.inventory(root)
+   subprocess.run(['git','-C',str(root/'a'),'config','core.sparseCheckout','false'],check=True)
    (root/'a'/'skills'/'same'/'outside').symlink_to('/tmp')
    with patch.object(s,'REPOS',repos),self.assertRaisesRegex(ValueError,'Locally changed'):s.inventory(root)
 if __name__=='__main__':unittest.main()

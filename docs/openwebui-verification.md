@@ -20,7 +20,7 @@ For mcpo 0.0.20, the verified compatibility pins are MCP 1.30.0 and FastAPI 0.11
 
 ## Migration safety
 
-Before offering removal of the old OMP program, migration rechecks the complete Wikipedia archive against the installer's publisher-checksum verification record and imports/reads back the skills and local connections. It then asks for confirmation of the exact program path. Original skills, configuration, conversations and Wikipedia remain untouched. If verification fails, no OMP removal is offered.
+Before offering removal of the old OMP program, migration rechecks the complete Wikipedia archive against the installer's publisher-checksum verification record and imports/reads back the skills and local connections. It then inventories the default and explicit install-directory binaries, current executable PATH, and recognized Bun/npm global package installations. Confirmation names the exact program paths or package. Cleanup verifies absence in those scopes afterward; unknown/custom installations stop it rather than being guessed at. Unset, off-PATH custom directories cannot be discovered automatically. Original skills, configuration, conversations, source checkouts and Wikipedia remain untouched, as do shared Bun/Node runtimes and unrelated packages. If migration verification fails, no OMP removal is offered.
 
 NVIDIA production setup selects CUDA dependencies for WebUI supporting models and verifies WebUI actually selects CUDA. Colibri retains its existing Vulkan configuration. CUDA PyTorch alone does not prove Faster Whisper's separate cuBLAS/cuDNN requirements are satisfied. Intel B580 document embeddings and reranking use explicitly selected OpenVINO GPU execution, with errors instead of CPU fallback. Speech acceleration remains undecided.
 
@@ -42,9 +42,18 @@ Source contracts:
 - [Open WebUI v0.13.4 environment backend fields](https://github.com/open-webui/open-webui/blob/v0.13.4/backend/open_webui/env.py)
 - [Native retrieval model construction](https://github.com/open-webui/open-webui/blob/v0.13.4/backend/open_webui/routers/retrieval.py)
 - [Sentence Transformers OpenVINO backend](https://sbert.net/docs/sentence_transformer/usage/efficiency.html#openvino)
-- [OpenVINO device discovery](https://docs.openvino.ai/2026/api/ie_python_api/_autosummary/openvino.Core.html)
+- [OpenVINO device discovery](https://docs.openvino.ai/2023.3/notebooks/002-openvino-api-with-output.html)
 
 Existing skill repositories and `.omp` data remain preserved after the optional
 verified OMP executable removal. They have not been deleted or silently moved.
 
 Approved model sources: [BGE small English v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5), [MiniLM L6 MS MARCO reranker](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L6-v2). The BGE prefix is applied only to queries through native WebUI configuration, not to stored passages or reranker inputs.
+
+## PDF/document extraction boundary
+
+An independent native PDFLoader/pypdf check with a synthetic scientific PDF
+retained text and page metadata, but flattened a table, lost equation structure
+and chart values, and returned no text for a scanned-only page. Retrieval of
+extracted text is not faithful reconstruction of every scientific PDF. This
+setup does not silently add or switch an OCR/extraction engine. Inspect extracted
+content before relying on answers about equations, tables, figures or scans.

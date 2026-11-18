@@ -49,6 +49,8 @@ def inventory(root):
   repo=root/name
   if not repo.is_dir() or linked(repo): raise ValueError('Missing or linked complete repository: '+str(repo))
   if git('-C',repo,'remote','get-url','origin')!=url: raise ValueError('Unexpected repository origin: '+name)
+  sparse=subprocess.run(['git','-C',str(repo),'config','--get','core.sparseCheckout'],capture_output=True,text=True).stdout.strip()
+  if sparse=='true':raise ValueError('Sparse checkout cannot verify the complete skill migration: '+name)
   if git('-C',repo,'status','--porcelain'): raise ValueError('Locally changed repository preserved; refusing to import unexpected files: '+name)
   revision=git('-C',repo,'rev-parse','HEAD')
   if name in REVISIONS and revision!=REVISIONS[name]:raise ValueError('Different repository revision preserved; audited source required: '+name)
@@ -80,6 +82,8 @@ def inventory(root):
    relative=directory.relative_to(repo).as_posix()
    ident='pc-setup-'+hashlib.sha256((url+'#'+relative).encode()).hexdigest()[:32]
    packages.append({'id':ident,'name':name+' / '+relative,'files':sorted(files,key=lambda x:x['path']),'meta':{'tags':['pc-setup','source:'+url,'revision:'+revision,'directory:'+relative],'i18n':None},'is_active':True})
+ if set(REPOS)==set(REVISIONS) and (len(packages)!=422 or sum(len(p['files']) for p in packages)!=3968):
+  raise ValueError('Audited complete skill inventory differs from 422 definitions / 3968 files; old installation retained')
  return packages
 class API:
  def __init__(self,url):

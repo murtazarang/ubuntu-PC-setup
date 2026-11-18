@@ -14,13 +14,16 @@ export UV_TOOL_DIR="$base/tools" UV_TOOL_BIN_DIR="$base/bin"
 if ! uv tool install --help | grep -q -- '--torch-backend'; then
   echo 'This uv is too old for explicit WebUI dependency selection. Update uv, then rerun.' >&2; exit 1
 fi
-[[ -f "$here/openwebui_gpu.py" ]] || { echo 'Missing shared GPU preflight helper.' >&2; exit 1; }
-python3 - "$here/openwebui_gpu.py" "$base/openwebui_gpu.py" <<'PYHELPER'
+python3 - "$here" "$base" <<'PYHELPER'
 import pathlib,sys,shutil
 source,dest=map(pathlib.Path,sys.argv[1:])
-if any(p.is_symlink() for p in (dest,*dest.parents)):raise SystemExit('Refusing linked GPU helper destination')
-if dest.exists() and dest.read_bytes()!=source.read_bytes():raise SystemExit('Existing differing GPU helper retained; inspect before update')
-shutil.copyfile(source,dest)
+names=['openwebui_gpu.py','openwebui_skills.py','openwebui_connections.py','migrate-openwebui.sh','remove-omp-runtime.py']
+for name in names:
+ src=source/name;target=dest/name
+ if not src.is_file():raise SystemExit('Missing setup companion: '+str(src))
+ if any(p.is_symlink() for p in (target,*target.parents)):raise SystemExit('Refusing linked helper destination')
+ if target.exists() and target.read_bytes()!=src.read_bytes():raise SystemExit('Existing differing helper retained: '+str(target))
+for name in names:shutil.copyfile(source/name,dest/name)
 PYHELPER
 export DATA_DIR="$base/data"
 export RAG_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5

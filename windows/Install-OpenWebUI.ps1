@@ -79,6 +79,7 @@ foreach($icon in @('colibri-serve.ico','colibri-serve-image.ico')){
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'openwebui_desktop.py') -Destination $root -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Finish-OpenWebUI.ps1') -Destination $root -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Remove-VerifiedOMP.ps1') -Destination $root -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Remove-OMPBinary.ps1') -Destination $root -Force
 $repo=Split-Path $PSScriptRoot -Parent
 Copy-Item -LiteralPath (Join-Path $repo 'openwebui_skills.py') -Destination $root -Force
 Copy-Item -LiteralPath (Join-Path $repo 'openwebui_connections.py') -Destination $root -Force
@@ -110,10 +111,17 @@ Write-Host 'Existing OMP skills and Wikipedia have not been removed. Skill impor
 
 # First-run account remains user-chosen; this shortcut completes authenticated imports.
 $finish=Join-Path $desktop 'Finish Open WebUI Setup.lnk'
-if(-not(Test-Path -LiteralPath $finish)){
+$finishTarget=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$oldFinishArguments='-NoProfile -File "'+(Join-Path $root 'Finish-OpenWebUI.ps1')+'" -Root "'+$root+'"'
+$updateFinish=-not(Test-Path -LiteralPath $finish)
+if(-not $updateFinish){
+    $previousFinish=$shell.CreateShortcut($finish)
+    $updateFinish=($previousFinish.TargetPath -ieq $finishTarget -and $previousFinish.Arguments -ceq $oldFinishArguments -and $previousFinish.Description -ceq 'Import complete skills and connect local Wikipedia after account creation.')
+}
+if($updateFinish){
     $link=$shell.CreateShortcut($finish)
     $link.TargetPath=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $link.Arguments='-NoProfile -File "'+(Join-Path $root 'Finish-OpenWebUI.ps1')+'" -Root "'+$root+'"'
+    $link.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $root 'Finish-OpenWebUI.ps1')+'" -Root "'+$root+'"'
     $link.WorkingDirectory=$root
     $link.Description='Import complete skills and connect local Wikipedia after account creation.'
     $link.Save()
