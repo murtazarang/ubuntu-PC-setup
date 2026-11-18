@@ -3,6 +3,13 @@ on:
   push:
     paths:
       - 'windows/**'
+      - '*.sh'
+      - 'create-colibri-shortcuts.py'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'assets/colibri/**'
+      - 'download_colibri_model.py'
+      - 'colibri-models.json'
       - '.github/workflows/windows-draft-checks.yml'
   workflow_dispatch:
 permissions:
@@ -102,6 +109,21 @@ jobs:
       - name: Legacy cleanup fixture (PowerShell 7)
         shell: pwsh
         run: ./windows/test-legacy-cleanup.ps1
+      - name: Colibri native Serve shortcut (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/tests/test-colibri-serve-shortcut.ps1
+      - name: Colibri native Serve shortcut (PowerShell 7)
+        shell: pwsh
+        run: ./windows/tests/test-colibri-serve-shortcut.ps1
+      - name: Colibri model ownership fixtures (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./windows/tests/test-colibri-model-ownership.ps1
+      - name: Colibri model ownership fixtures (PowerShell 7)
+        shell: pwsh
+        run: ./windows/tests/test-colibri-model-ownership.ps1
+      - name: Model downloader safe transfer fixtures
+        shell: pwsh
+        run: uv run --no-project python -m unittest discover -s tests -p 'test_*model*.py' -v
       - name: Actual Colibri UI install and rerun (no models or GPU)
         shell: pwsh
         run: ./windows/tests/test-colibri-install.ps1

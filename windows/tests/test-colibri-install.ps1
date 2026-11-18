@@ -12,8 +12,8 @@ try {
     foreach($hardware in @('NvidiaSingle','NvidiaDual','Intel')){
         $env:LOCALAPPDATA=Join-Path $work $hardware
         New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force|Out-Null
-        & (Join-Path $base 'Install-Colibri.ps1') -Hardware $hardware -NoShortcut
-        & (Join-Path $base 'Install-Colibri.ps1') -Hardware $hardware -NoShortcut
+        & (Join-Path $base 'Install-Colibri.ps1') -Hardware $hardware -NoShortcut -SkipModelDownload
+        & (Join-Path $base 'Install-Colibri.ps1') -Hardware $hardware -NoShortcut -SkipModelDownload
     }
     $root=Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup'
     $config=Get-Content (Join-Path $root 'settings.json') -Raw|ConvertFrom-Json
@@ -21,6 +21,10 @@ try {
     $server=Join-Path $config.release 'app\ui\server.py'
     & $python (Join-Path $config.release 'app\coli') serve --help
     if($LASTEXITCODE){throw 'Real Colibri CLI help failed.'}
+    & $python (Join-Path $config.release 'app\coli') import --help
+    if($LASTEXITCODE){throw 'Real Colibri import help failed.'}
+    & $python (Join-Path $config.release 'app\coli') web --help
+    if($LASTEXITCODE){throw 'Real Colibri web help failed.'}
     $process=Start-Process -FilePath $python -ArgumentList @(('"'+$server+'"'),'--host','127.0.0.1','--port','18790','--backend','http://127.0.0.1:18000','--models-dir',('"'+(Join-Path $work 'models')+'"')) -PassThru
     $ready=$false
     for($i=0;$i -lt 30;$i++){

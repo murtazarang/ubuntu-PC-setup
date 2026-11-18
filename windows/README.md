@@ -33,7 +33,7 @@ appropriate hardware name. The stage runs Windows Update and installs the NVIDIA
 App on NVIDIA machines or Intel Driver & Support Assistant on the Intel machine.
 Open the installed vendor app, install its recommended graphics driver, and
 reboot. The script does not install a pinned driver automatically. Then run `./Setup.ps1 -Stage Desktop -Hardware NvidiaSingle` with the
-same hardware selection. The desktop stage can take hours to download Wikipedia. Colibri models are chosen and downloaded later in its UI; model use remains local by default and hosted providers in OMP are not disabled.
+same hardware selection. The desktop stage can take hours to download Wikipedia. The assigned Colibri text and image models also download during setup. Model use remains local by default; hosted providers in OMP are not disabled.
 
 The installed applications include Steam, Firefox, Stremio,
 Spotify, VS Code, PowerToys, Colibri and the
@@ -63,27 +63,44 @@ driver status on Intel, both 3060s on the dual system, then start the local mode
 Confirm its `/v1/models` endpoint and run a tool-using test in both Oh My Pi and
 Colibri. Verify OpenZIM search and source retrieval offline, plus all Firefox
 extensions and settings, Win+F2, Win+V, Awake, SignalRGB and Steam.
-None of these hardware, GUI, installer, archive download, or end-to-end AI tests
-has been run by the author of these scripts.
+The full desktop installation, physical GPUs, model inference, Firefox GUI and
+end-to-end AI integrations still require verification on your PCs.
 
-Python tests check configuration merges in isolation; mocked PowerShell tests run in Windows CI. Neither executes real installers, GPU inference, Firefox, or a full offline MCP query. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
+Python tests check configuration merges in isolation; mocked PowerShell tests run in Windows CI. The Colibri smoke test additionally downloads and verifies the real release, installs its Python dependencies, checks reruns and starts its upstream UI without model weights. It does not test GPU inference or a full offline MCP query. Sources: [OpenZIM MCP](https://github.com/cameronrye/openzim-mcp),
 [OMP](https://github.com/can1357/oh-my-pi), [Colibri](https://github.com/JustVugg/colibri),
 [PowerToys DSC](https://learn.microsoft.com/en-us/windows/powertoys/dsc-configure/microsoft-dsc).
 
 ## Colibri replaces Paseo, Strata and XeStrata
 
 The Desktop stage now installs Colibri v2.1.0 and its **built-in browser UI**.
-It does not install Paseo and does not download a model. This is not the separate
+It does not install Paseo. It downloads and verifies the assigned model below. This is not the separate
 Tauri shell: that shell does not manage inference or model downloads.
 
-Start **Colibri UI** from the desktop shortcut. It invokes upstream's `coli ui`
-directly, using the installed Python environment; no custom launcher or UI is added.
-The UI is local-only at `http://127.0.0.1:8790`. Its Models page downloads models
-with progress and resume. Choose a model there after reviewing its disk and
-memory requirements. A model download remains your action in the UI.
+The installer creates exactly two desktop shortcuts:
+- **Colibri Serve**: selected text model at `127.0.0.1:8000`, with the Serve icon badge.
+- **Colibri Serve Image**: Qwen-Image-2.1 at `127.0.0.1:8001`, with the Serve Img icon badge.
+
+**Colibri Serve** starts upstream `coli serve` on port 8000 in its own terminal,
+then upstream's modern `coli ui` on port 8790, which opens your browser. Keep both
+terminals open while using it. The UI may open before model loading finishes.
+When finished, stop each process with Ctrl+C in its own terminal. If either port
+is already occupied, the shortcut refuses to start another instance and leaves
+existing processes alone. To reopen just the UI while the server remains running:
+
+```powershell
+$install = "$env:LOCALAPPDATA\Colibri-PC-Setup\v2.1.0-vulkan"
+& "$install\venv\Scripts\python.exe" "$install\app\coli" ui --host 127.0.0.1 --port 8790 --backend http://127.0.0.1:8000 --models-dir "$env:USERPROFILE\colibri-models"
+```
+
+**Colibri Serve Image** uses upstream `coli web` on port 8001 because that bundled
+dashboard supports image generation. The modern `coli ui` at this release does
+not have a working image-generation submission handler. No custom UI is added.
+Stop the text server before using image generation; simultaneous memory use is
+not validated. The installer creates no third UI shortcut and leaves existing
+shortcuts alone. The modern UI Models page remains available for other downloads.
 
 **Windows limitation:** upstream's UI model-switching service currently supports
-Linux only. After downloading, use upstream's existing CLI in PowerShell:
+Linux only. The Serve shortcut directly invokes the upstream CLI, so no custom model-selection interface is added. For a different downloaded model, use upstream's existing CLI in PowerShell:
 
 ```powershell
 $install = "$env:LOCALAPPDATA\Colibri-PC-Setup\v2.1.0-vulkan"
@@ -102,17 +119,33 @@ folder. The OpenAI-compatible endpoint is `http://127.0.0.1:8000/v1`. Once runni
 existing provider configuration rather than overwriting it.
 
 Hardware profiles:
-- **RTX 3080 10 GB:** default Vulkan with upstream memory planning; no CUDA toolkit or overlay is needed.
-- **Two RTX 3060 12 GB:** default Vulkan with `COLI_VK_DEV2=auto` enabling the
+- **RTX 3080 10 GB:** Qwen3.8-27B UD-Q4_K_M GGUF (about 16.6 GB), text-only, using Vulkan.
+- **Two RTX 3060 12 GB:** Qwen3.8-Flash-Next IQ2_XS, Vulkan with `COLI_VK_DEV2=auto` enabling the
   upstream second-device tier. VRAM is not presented as one unified allocation.
   Upstream has not measured real multi-GPU Vulkan performance; verify both device
   names in engine output.
-- **Intel Arc B580 12 GB:** Vulkan, no CUDA overlay. Upstream chooses the preferred
+- **Intel Arc B580 12 GB:** Qwen3.8-27B UD-Q4_K_M GGUF (about 16.6 GB), text-only, using Vulkan, no CUDA overlay. Upstream chooses the preferred
   discrete device; verify the log identifies B580 rather than integrated graphics.
 
-All profiles retain the installed GPU drivers. No CUDA toolkit, WSL or model
-weights are installed. All three profiles use Vulkan, including Qwen3.8. Do not infer performance from
-combined RAM/VRAM alone.
+All profiles retain the installed GPU drivers. No CUDA toolkit or WSL is installed.
+Pinned model artifacts are resumed and SHA-256 checked, including existing files.
+Both text profiles import GGUF in link mode without duplicating or converting the
+weight files. Model directories are under your configured `colibri-models`
+folder. Preserve both the source and model subdirectories. Existing unrelated
+models are not removed. Downloaded weights can be copied from another computer
+into the corresponding source folder before rerunning setup; every artifact is
+verified against the pinned manifest before import.
+Do not infer performance from combined RAM/VRAM alone; actual inference on these
+three PCs is not yet verified. The text models are text-only. The separate Qwen-Image-2.1 checkpoint is downloaded
+for text-to-image generation on all three PCs, retaining its official directory
+layout without conversion. It adds about 33 GB on disk. Image generation uses
+Vulkan for supported operations with CPU work remaining; the image shortcut does
+not enable the second-GPU text-model option. Its actual speed on these GPUs is
+unverified. Video generation is not claimed.
+
+Qwen-Image-2.1 uses the [Qwen Research License](https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE).
+Review its use restrictions before using generated images beyond permitted uses.
+[Upstream image instructions](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/qwen-image.md).
 
 Sources: [Windows release installation](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/windows.md),
 [UI](https://github.com/JustVugg/colibri/blob/v2.1.0/ui/README.md),

@@ -72,5 +72,5 @@ if (-not (Test-Path -LiteralPath $final -PathType Leaf)) {
 & $uv run --no-project python (Join-Path $PSScriptRoot 'configure_local.py') --agent-dir $agentDir --bridge $bridge --legacy-uvx $uvx --zim-dir $ArchiveDirectory
 if ($LASTEXITCODE -ne 0) { throw 'Could not register OpenZIM MCP.' }
 
-Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP and Paseo."
+Write-Host "Registered local OpenZIM MCP; archive: $final. Restart OMP."
 

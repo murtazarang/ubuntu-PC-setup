@@ -1,0 +1,1 @@
+Colibri bird from JustVugg/colibri assets/colibri-logo.svg, copyright 2026 Vincenzo Fornaro, Apache-2.0. Modified: isolated bird and added Serve and Serve Img badges. PNG and ICO rendered for desktop shortcuts. Upstream: https://github.com/JustVugg/colibri/tree/v2.1.0/assets

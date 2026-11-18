@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Colibri's built-in browser UI; download models interactively in that UI.
+# Install native Colibri, the selected text model and its Serve shortcut.
 set -Eeuo pipefail
 if (( EUID == 0 )); then echo 'Run as the desktop user.' >&2; exit 1; fi
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
@@ -31,5 +31,4 @@ if [[ -e $link || -L $link ]]; then
 else
  ln -s "$release/coli" "$link"
 fi
-printf '%s\n' 'Colibri installed. Native UI: coli ui --models-dir "$HOME/colibri-models"'
-printf '%s\n' 'Download a model in Models, then start the first gateway with the native coli serve command documented in README.md.'
+"$here/configure-colibri-model.sh" "$release" "${1:-auto}"

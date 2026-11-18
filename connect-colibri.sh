@@ -19,10 +19,13 @@ if os.path.exists(p):
 else: data={}
 if not isinstance(data,dict): raise SystemExit('models.yml must be a mapping')
 providers=data.setdefault('providers',{})
+def entry(model):
+ return {'id':model,'name':'Local '+model,'reasoning':True,'input':['text'],'contextWindow':32768,'maxTokens':4096,'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0}}
 existing=providers.get('pc-setup-colibri')
 if existing is not None:
  expected={'baseUrl':'http://127.0.0.1:8000/v1','api':'openai-completions','auth':'none','compat':{'supportsDeveloperRole':False},'models':existing.get('models') if isinstance(existing,dict) else None}
- if existing != expected:
+ models=existing.get('models',[]) if isinstance(existing,dict) else []
+ if existing != expected or not isinstance(models,list) or len(models)!=1 or not isinstance(models[0],dict) or not isinstance(models[0].get('id'),str) or models[0] != entry(models[0]['id']):
   raise SystemExit('Existing pc-setup-colibri provider has custom settings; refusing to overwrite it')
 providers['pc-setup-colibri']={'baseUrl':f'http://127.0.0.1:{port}/v1','api':'openai-completions','auth':'none','compat':{'supportsDeveloperRole':False},'models':[{'id':model,'name':'Local '+model,'reasoning':True,'input':['text'],'contextWindow':32768,'maxTokens':4096,'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0}}]}
 fd,tmp=tempfile.mkstemp(dir=os.path.dirname(p));os.fchmod(fd,0o600)
@@ -30,7 +33,19 @@ with os.fdopen(fd,'w') as f: yaml.safe_dump(data,f,sort_keys=False)
 os.replace(tmp,p)
 PY
 selector="pc-setup-colibri/$model"
-roles=$(omp config get modelRoles --json | jq -ec --arg m "$selector" '.value | if type == "object" then .default = $m else {default:$m} end')
+roles=$(omp config list --scope global --json | jq -ec --arg m "$selector" '
+ if type != "object" then error("Global settings must be an object")
+ elif has("modelRoles") then
+   if (.modelRoles.value | type) != "object" then error("Global roles must be an object")
+   else .modelRoles.value | .default = $m end
+ else {default:$m} end')
 omp config set modelRoles "$roles"
-echo "OMP default model set to $selector on 127.0.0.1:$port."
+echo "OMP global default model saved as $selector on 127.0.0.1:$port."
+if effective=$(omp config get modelRoles --json | jq -er '.value.default | select(type == "string")'); then
+ if [[ $effective != "$selector" ]]; then
+  echo "Existing override remains active here: $effective. Project/environment settings were preserved."
+ fi
+else
+ echo 'Could not verify effective OMP default; global setting saved, existing overrides preserved.' >&2
+fi
 echo 'Test a prompt and tool call in OMP after starting Colibri.'

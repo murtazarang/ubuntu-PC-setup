@@ -35,7 +35,7 @@ Run in a **logged-in GNOME desktop session**:
 ./setup.sh desktop
 ```
 
-This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs Colibri's built-in browser UI. It no longer installs Paseo, Strata or XeStrata. No model is downloaded by the setup. OMP's other providers remain available.
+This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs Colibri's built-in browser UI. It no longer installs Paseo, Strata or XeStrata. Setup downloads a checksum-verified text GGUF, resuming interrupted transfers and reusing verified local files. OMP's other providers remain available.
 
 ### Offline educational reference
 
@@ -56,16 +56,13 @@ All three use the official Colibri v2.1.0 Linux CPU+Vulkan release, verified wit
 - Two RTX 3060s: additionally `COLI_VK_DEV2=auto`, the upstream second-device expert tier. This is not a promise of 24 GB contiguous memory or measured speedup; model support, budgets and actual use of both GPUs must be verified. Upstream documents that its second-device tests do not establish performance on two real GPUs.
 - Intel Arc B580: Vulkan selects a preferred discrete GPU. Check the startup log names the B580 rather than the CPU/iGPU.
 
-Run the native `coli ui --models-dir "$HOME/colibri-models"` command. The Models page can download catalog models and compatible Hugging Face GGUFs into `~/colibri-models`. Once downloaded, start the first model in another terminal:
+Setup selects Qwen3.8-27B UD-Q4_K_M text GGUF for the RTX 3080 and Arc B580, and Qwen3.8-Flash-Next IQ2_XS for the dual RTX 3060. It imports the verified GGUF through native `coli import --mode link --no-mtp`, without copying large weights or a PyTorch conversion. Models live in `~/colibri-models/<profile>/{source,model}`. Keep the source directory: imported metadata points at its weights. Copying a verified source directory to the same relative location on another PC avoids downloading it again; rerun setup to rebuild local links. Existing customized imported metadata is preserved rather than overwritten.
 
-```bash
-COLI_VULKAN=1 COLI_NO_OMP_TUNE=1 coli serve --model /absolute/path/to/downloaded/model
-./connect-colibri.sh       # point OMP at the running model on port 8000
-```
+Run `./configure-ai.sh NvidiaSingle`, `NvidiaDual`, or `Intel` to select explicitly; default detection recognizes the three requested PCs and otherwise stops with instructions. `COLIBRI_MODELS_DIR` can set another model root. Launch **Colibri Serve** from the desktop/app menu. GNOME may require **Allow Launching** once. It starts native `coli serve` and the modern `coli ui` (port 8790, backend 8000) together in a visible terminal. Keep it open; Ctrl+C stops the foreground process group. Existing occupied server/UI ports are not reused or killed. The shortcut applies Vulkan and the dual-GPU expert-tier flag only for NvidiaDual. No autostart or custom model-running service is installed.
 
-For the dual RTX 3060 PC, prefix both `coli ui` and `coli serve` commands with `COLI_VULKAN=1 COLI_VK_DEV2=auto COLI_NO_OMP_TUNE=1`. For the single RTX 3080 and Arc B580, use `COLI_VULKAN=1 COLI_NO_OMP_TUNE=1`. These are upstream environment settings, not a separate launcher.
+The built-in UI remains available with `coli ui --models-dir "$HOME/colibri-models"` at `http://127.0.0.1:8790`; inference is loopback `http://127.0.0.1:8000/v1`. Run `./connect-colibri.sh` after the server starts to update OMP. The installed text GGUFs do **not** support image/video inputs. Model Downloads/Use in the upstream UI remain available; Linux Use switches an already-running gateway. Rerun the OMP connection helper after changing models.
 
-The UI is at `http://127.0.0.1:8790`, inference API at `http://127.0.0.1:8000/v1`. Linux UI **Use** switches an already-running gateway, preserving its environment; if switching model, rerun the OMP connection helper to refresh the model ID. A UI without an engine is sufficient for downloads, not chat. Keep these foreground terminals open; Ctrl+C stops them. No autostart service is added. Use upstream `--models-dir DIR` to select a different download folder. This installs the built-in UI, not the separate Tauri shell.
+Setup also downloads the native Qwen-Image-2.1 checkpoint (about 33 GB) with the same resume/hash/reuse checks, and creates **Colibri Serve Image** with a **Serve Img** icon label. It invokes upstream `coli web` directly on loopback port **8001**, using isolated Python with NumPy and Pillow. Text Serve uses **8000**. Run one at a time unless memory permits both; separate ports do not guarantee enough combined GPU/RAM capacity. Image generation is distinct from the text model's input capabilities. The image checkpoint's license limits use to research/evaluation; read its downloaded LICENSE before use. The image shortcut opens the upstream image-generation web frontend automatically. The modern `coli ui` does not implement image generation, so it is used only for text. No third desktop UI shortcut is created.
 
 For an existing setup, first preview `./remove-legacy-ai.sh`; use `./remove-legacy-ai.sh --apply` to confirm app removal and archive known data/config directories. Shared packages, OMP/skills/Wikipedia and external models are preserved. Inspect its backup manifest before permanently deleting anything. Then run `./configure-ai.sh`. The obsolete `connect-xestrata.sh` is replaced by `connect-colibri.sh`.
 
