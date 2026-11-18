@@ -211,3 +211,25 @@ class DirectCleanupTests(unittest.TestCase):
    p=pathlib.Path(td)
    r=self.run_cleanup(p,systemctl="#!/bin/sh\nprintf '%s\\n' '[Service]' 'ExecStart=/usr/bin/xestrata --no-browser' 'ExecStart=/other/app'\n")
    self.assertNotEqual(r.returncode,0);self.assertIn('Unrecognized',r.stderr)
+
+class PrivilegedReadOnlyScanTests(unittest.TestCase):
+ def helper(self):
+  import re
+  return re.search(r'privileged = r"""(.*?)"""',(ROOT/'remove-legacy-ai.sh').read_text(),re.S).group(1)
+ def payload(self):
+  p=pathlib.Path('/proc')/str(os.getpid())
+  return {'uid':os.getuid(),'roots':['/not-a-runtime'],'packages':[], 'processes':[{'pid':os.getpid(),'started':(p/'stat').read_text().rsplit(')',1)[1].split()[19]}]}
+ def execute(self,payload):
+  import sys
+  return subprocess.run([sys.executable,'-I','-c',self.helper(),json.dumps(payload)],capture_output=True,text=True)
+ def test_read_only_identity_verified_nonmatching_process(self):
+  r=self.execute(self.payload());self.assertEqual(r.returncode,0,r.stderr)
+ def test_changed_pid_start_time_fails_closed(self):
+  payload=self.payload();payload['processes'][0]['started']='not-current'
+  r=self.execute(payload);self.assertNotEqual(r.returncode,0);self.assertIn('identity changed',r.stderr)
+ def test_changed_uid_fails_closed(self):
+  payload=self.payload();payload['uid']+=1
+  r=self.execute(payload);self.assertNotEqual(r.returncode,0);self.assertIn('identity changed',r.stderr)
+ def test_matching_executable_fails_closed(self):
+  payload=self.payload();payload['packages']=[os.readlink('/proc/'+str(os.getpid())+'/exe')]
+  r=self.execute(payload);self.assertNotEqual(r.returncode,0);self.assertIn('still running',r.stderr)

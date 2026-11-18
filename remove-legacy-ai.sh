@@ -74,13 +74,15 @@ fi
 package_files=''
 if (( ${#packages[@]} )); then package_files=$(dpkg-query -L "${packages[@]}"); fi
 PACKAGE_FILES="$package_files" python3 - "${paths[@]}" <<'PY'
-import os,pathlib,sys
+import json,os,pathlib,subprocess,sys
 roots=[str(pathlib.Path(x).absolute()) for x in sys.argv[1:]]
 package_files=set(os.environ['PACKAGE_FILES'].splitlines())
 unreadable=[]
 for proc in pathlib.Path('/proc').glob('[0-9]*'):
+ if 'started' in locals():del started
  try:
   if proc.stat().st_uid!=os.getuid() or int(proc.name)==os.getpid():continue
+  started=(proc/'stat').read_text().rsplit(')',1)[1].split()[19]
   args=(proc/'cmdline').read_bytes().decode(errors='replace').split('\0')
   executable=os.readlink(proc/'exe').removesuffix(' (deleted)')
  except (FileNotFoundError,ProcessLookupError):continue
@@ -92,12 +94,38 @@ for proc in pathlib.Path('/proc').glob('[0-9]*'):
     if name=='status':text='; '.join(line for line in text.splitlines() if line.startswith(('Name:','State:','Uid:','Gid:','TracerPid:','NoNewPrivs:')))
     details.append(name+'='+text[:1000].strip())
    except OSError as detail_error:details.append(name+' unreadable: '+str(detail_error))
-  unreadable.append('PID '+proc.name+': '+str(exc)+' | '+' | '.join(details))
+  if 'started' not in locals():raise SystemExit('Cannot establish process identity before privileged inspection: '+proc.name)
+  unreadable.append({'pid':int(proc.name),'started':started,'detail':'PID '+proc.name+': '+str(exc)+' | '+' | '.join(details)})
   continue
  if executable in package_files or any(executable==root or executable.startswith(root+'/') for root in roots) or any(arg==root or arg.startswith(root+'/') for arg in args for root in roots):
   raise SystemExit('A legacy runtime is still running (PID '+proc.name+'). Close it and rerun; nothing was forcibly killed.')
 if unreadable:
- raise SystemExit('Cannot safely inspect all current-user processes; no deletion performed.\n'+'\n'.join(unreadable))
+ print('Some current-user process executables require elevated read access. Requesting sudo for a READ-ONLY rescan of these PIDs only:', ', '.join(str(p['pid']) for p in unreadable),flush=True)
+ # Isolated Python ignores user PYTHONPATH. The helper only reads /proc; it does
+ # not kill processes, modify files, alter permissions or change system settings.
+ privileged = r"""
+import json,os,pathlib,sys
+request=json.loads(sys.argv[1]);roots=request['roots'];packages=set(request['packages']);uid=request['uid']
+for item in request['processes']:
+ p=pathlib.Path('/proc')/str(int(item['pid']))
+ try:
+  owner=p.stat().st_uid
+  started=(p/'stat').read_text().rsplit(')',1)[1].split()[19]
+  if owner!=uid or started!=item['started']:raise SystemExit('Process identity changed; rerun cleanup: '+p.name)
+  executable=os.readlink(p/'exe').removesuffix(' (deleted)')
+  args=(p/'cmdline').read_bytes().decode(errors='replace').split('\0')
+  if p.stat().st_uid!=uid or (p/'stat').read_text().rsplit(')',1)[1].split()[19]!=started:
+   raise SystemExit('Process identity changed during inspection: '+p.name)
+ except (FileNotFoundError,ProcessLookupError):continue
+ except OSError as exc:raise SystemExit('Privileged process inspection failed; no deletion: '+str(exc))
+ if executable in packages or any(executable==r or executable.startswith(r+'/') for r in roots) or any(a==r or a.startswith(r+'/') for a in args for r in roots):
+  raise SystemExit('A legacy runtime is still running (PID '+p.name+'). Close it and rerun.')
+"""
+ payload={'uid':os.getuid(),'roots':roots,'packages':list(package_files),'processes':unreadable}
+ try:result=subprocess.run(['/usr/bin/sudo','/usr/bin/python3','-I','-c',privileged,json.dumps(payload)],check=False)
+ except OSError as exc:raise SystemExit('Read-only sudo inspection unavailable; no deletion: '+str(exc))
+ if result.returncode:raise SystemExit('Read-only process verification failed or was declined; no deletion performed.')
+
 PY
 if (( ${#packages[@]} )); then sudo apt-get remove "${packages[@]}"; fi
 check_paths

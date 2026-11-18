@@ -35,3 +35,20 @@ using a deletion subtree block removal, rather than being force-killed.
 Safe temporary-directory tests cover preview, declined confirmation, direct
 model removal with chat preservation/no quarantine, symlink refusal and upstream
 launcher stop/unlink. No real apt uninstall or GPU runtime shutdown was tested.
+
+## Protected same-user processes
+
+Ubuntu CI exposed user-manager `systemd` and `(sd-pam)` processes whose executable
+links cannot be read by an ordinary same-UID process. No process-name exemption
+is used. If the ordinary scan cannot inspect an executable, cleanup explains
+that it will request `sudo` for a read-only rescan of only those unresolved PIDs.
+The helper runs `/usr/bin/python3 -I`, rechecks original UID and `/proc/PID/stat`
+start time before and after inspection, and rejects changed identity, inaccessible
+processes, or a matching runtime. It does not terminate anything, write files,
+change permissions, or alter security settings. Declined/unavailable elevation
+stops cleanup before deletion. Native package removal separately uses sudo.
+
+Kernel access details: [proc_pid_exe(5)](https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html)
+documents the ptrace read-credentials check; [proc_pid_stat(5)](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html)
+defines starttime field 22. Tests exercise unchanged process identity, changed
+UID/start time, and an actual matching executable, without requiring model files.
