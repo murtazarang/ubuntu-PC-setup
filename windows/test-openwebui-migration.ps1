@@ -71,8 +71,14 @@ try {
     $cleanup=Join-Path $root 'Remove-VerifiedOMP.ps1'
     Set-Content -LiteralPath $cleanup -Value "Set-Content -LiteralPath (Join-Path `$PSScriptRoot 'cleaned') -Value yes"
     Set-Content -LiteralPath $helper -Value 'import sys; sys.exit(1)'
-    '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
-    if($LASTEXITCODE -ne 1){throw 'Finish failure did not return nonzero'}
+    $expectedFailurePreference=$ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 surfaces a child's expected stderr as NativeCommandError.
+        $ErrorActionPreference='Continue'
+        '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root 2>$null
+        $expectedFailureExit=$LASTEXITCODE
+    } finally {$ErrorActionPreference=$expectedFailurePreference}
+    if($expectedFailureExit -ne 1){throw 'Finish failure did not return nonzero'}
     if(Test-Path (Join-Path $root 'cleaned')){throw 'Failed import triggered cleanup'}
     Set-Content -LiteralPath $helper -Value "import sys; assert '--reference-manifest' in sys.argv; assert '--wiki-key-file' in sys.argv"
     '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $source 'Finish-OpenWebUI.ps1') -Root $root

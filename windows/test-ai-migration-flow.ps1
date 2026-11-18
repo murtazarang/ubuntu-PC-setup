@@ -33,6 +33,7 @@ try {
     foreach($case in @('import-fails','legacy-declines','success','linked-weights')){
         $env:TEST_AI_LOG=Join-Path $temp ($case+'.log')
         $env:TEST_LEGACY_ROOT=''
+        Set-Content (Join-Path $root 'desktop.json') '{"text_model":"C:\\fixture-models\\text","image_model":"C:\\fixture-models\\image"}'
         if($case -eq 'linked-weights'){
             $env:TEST_LEGACY_ROOT='C:\fixture-legacy'
             $activeModel=Join-Path $root 'custom-model'
@@ -43,8 +44,14 @@ try {
 
         $env:TEST_FAIL_IMPORT=if($case -eq 'import-fails'){'1'}else{'0'}
         $env:TEST_FAIL_LEGACY=if($case -eq 'legacy-declines'){'1'}else{'0'}
-        '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $driver 2>$null
-        $code=$LASTEXITCODE;$events=@(Get-Content $env:TEST_AI_LOG)
+        $previousErrorAction=$ErrorActionPreference
+        try {
+            # PS5.1 surfaces redirected native stderr as ErrorRecords; expected child failures must reach explicit exit assertions.
+            $ErrorActionPreference='Continue'
+            '' | & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $driver 2>$null
+            $code=$LASTEXITCODE
+        } finally {$ErrorActionPreference=$previousErrorAction}
+        $events=@(Get-Content $env:TEST_AI_LOG)
         if('text' -in $events -or 'image' -in $events){throw 'Migration must not start or switch a model'}
         if($case -eq 'success'){
             if($code -ne 0 -or $events[-2] -ne 'legacy' -or $events[-1] -ne 'omp'){throw 'Successful migration ordering failed'}
