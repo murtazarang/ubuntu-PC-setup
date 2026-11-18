@@ -40,15 +40,20 @@ read -r -p 'Type DELETE LEGACY AI to uninstall the packages and permanently dele
 # Reject symlinked roots/parents and mounted model subtrees; never follow them.
 check_paths() {
  python3 - "${paths[@]}" <<'PY'
-import pathlib,sys
+import pathlib,sys,os,re
 for name in sys.argv[1:]:
  p=pathlib.Path(name)
  for part in (p,*p.parents):
   if part.is_symlink():raise SystemExit('Refusing symlinked deletion path: '+str(part))
  if p.exists():
-  for child in (p,*p.rglob('*')):
-   if child.is_mount():raise SystemExit('Refusing mounted deletion subtree: '+str(child))
-   if child.name.lower().endswith(('.zim','.zim.part')):raise SystemExit('Wikipedia/archive download retained; cleanup stopped: '+str(child))
+  mounts=[pathlib.Path(re.sub(r'\\([0-7]{3})',lambda m:chr(int(m[1],8)),line.split()[4])) for line in pathlib.Path('/proc/self/mountinfo').read_text().splitlines()]
+  for mount in mounts:
+   if mount==p or p in mount.parents:raise SystemExit('Refusing mounted deletion subtree: '+str(mount))
+  def onerror(error):raise SystemExit('Cannot safely inspect old data; cleanup stopped: '+str(error))
+  for directory,dirs,files in os.walk(p,followlinks=False,onerror=onerror):
+   for name in (*dirs,*files):
+    child=pathlib.Path(directory)/name
+    if child.name.lower().endswith(('.zim','.zim.part')):raise SystemExit('Wikipedia/archive download retained; cleanup stopped: '+str(child))
 PY
 }
 check_paths
