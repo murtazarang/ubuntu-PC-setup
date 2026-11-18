@@ -3,7 +3,7 @@ import argparse
 import logging
 from pathlib import Path
 import time
-from power_events import DisplayState, WindowsPowerListener, SingleInstance
+from lifecycle import DisplayState, SingleInstance
 from PIL import Image
 
 
@@ -45,13 +45,13 @@ def cleanup(sources, device):
         logging.warning('Could not turn off display backlight: %s', exc)
 
 
-def main():
+def main(argv=None, state=None, backend_provider=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--rotation', type=int, choices=[0,90,180,270], default=270,
                         help='Counterclockwise rotation of portrait image into physical framebuffer')
     parser.add_argument('--index', type=int, default=0)
     parser.add_argument('--preview', type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     from ax206panel.render.engine import RenderEngine
     from ax206panel.render.theme import load_theme
     engine = RenderEngine(load_theme(str(Path(__file__).with_name('portrait.yaml'))))
@@ -65,14 +65,16 @@ def main():
     from ax206panel.framebuffer import image_to_rgb565
     from ax206panel.sensors import open_sources, merge_polls
     logging.basicConfig(level=logging.INFO)
-    backend, backend_name = get_backend('auto')
-    state = DisplayState()
+    backend, backend_name = backend_provider() if backend_provider else get_backend('auto')
+    state = state if state is not None else DisplayState()
     sources = []
     device = None
     warned = False
-    with SingleInstance(), WindowsPowerListener(state):
+    sensor_retry_at = 0.0
+    with SingleInstance():
         try:
             sources = open_sources()
+            sensor_retry_at = time.monotonic() + 30
             hide_gpu = ambiguous_gpu(sources)
             if hide_gpu:
                 logging.warning('Multiple GPUs of the same vendor: hiding ambiguous GPU readings.')
@@ -84,6 +86,17 @@ def main():
                 # Sensors and image rendering run outside the USB lock so a slow
                 # sensor never prevents the listener sending the off command.
                 values = merge_polls(sources)
+                if ('cpu.temp' not in values or 'gpu.temp' not in values) and time.monotonic() >= sensor_retry_at:
+                    sensor_retry_at = time.monotonic() + 30
+                    logging.info('Retrying hardware sensor discovery after missing temperature readings.')
+                    for source in sources:
+                        try:
+                            source.close()
+                        except Exception:
+                            logging.exception('Could not close sensor before retry.')
+                    sources = open_sources()
+                    hide_gpu = ambiguous_gpu(sources)
+                    values = merge_polls(sources)
                 if hide_gpu:
                     values = {k:v for k,v in values.items() if not k.startswith('gpu.')}
                 if not warned and ('cpu.temp' not in values or 'gpu.temp' not in values):

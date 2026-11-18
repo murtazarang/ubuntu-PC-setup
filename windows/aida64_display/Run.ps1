@@ -1,19 +1,32 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [ValidateSet('Panel','Info','Sensors','TestPattern','Preview')][string]$Action = 'Panel',
-    [ValidateSet(0,90,180,270)][int]$Rotation = 270,
-    [ValidateRange(0,99)][int]$Index = 0,
-    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'AX206Panel')
+    [ValidateSet('Status','Info','Sensors','TestPattern','Preview')][string]$Action = 'Status',
+    [ValidateRange(0,99)][int]$Index = 0
 )
 $ErrorActionPreference = 'Stop'
-$python = Join-Path $InstallDir '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $python)) { throw 'Run Setup.ps1 first.' }
-switch ($Action) {
-    'Info' { & $python -m ax206panel --info --index $Index }
-    'Sensors' { & $python -m ax206panel --list-sensors }
-    'TestPattern' { & $python -m ax206panel --test-pattern --index $Index }
-    'Preview' { & $python (Join-Path $InstallDir 'panel.py') --preview (Join-Path $InstallDir 'preview.png') }
-    'Panel' { & $python (Join-Path $InstallDir 'panel.py') --rotation $Rotation --index $Index }
+$config = & {
+    param($Helper,$ManagedRoot)
+    . $Helper -FunctionsOnly
+    Read-ServiceConfig $ManagedRoot
+} (Join-Path $PSScriptRoot 'Service.ps1') (Join-Path $env:ProgramFiles 'AX206Panel')
+$dir = $config.release
+$python = Join-Path $dir '.venv\Scripts\python.exe'
+if ($Action -eq 'Status') {
+    & (Join-Path $dir 'Service.ps1') -Action Status
+    return
 }
-if ($LASTEXITCODE -ne 0) { throw "AX206 $Action failed. Read the message above; no drivers or security settings were changed." }
+if ($Action -in @('Info','TestPattern') -and (Get-Service AX206Panel).Status -ne 'Stopped') {
+    throw 'Stop the AX206Panel service before USB diagnostics so two processes do not claim the display. Restart it afterwards.'
+}
+$oldDll = $env:AX206_LHM_DLL
+try {
+    $env:AX206_LHM_DLL = Join-Path $dir 'source\lib\LibreHardwareMonitorLib.dll'
+    switch ($Action) {
+        'Info' { & $python -E -s -m ax206panel --info --index $Index }
+        'Sensors' { & $python -E -s -m ax206panel --list-sensors }
+        'TestPattern' { & $python -E -s -m ax206panel --test-pattern --index $Index }
+        'Preview' { & $python -E -s (Join-Path $dir 'panel.py') --preview (Join-Path $env:TEMP 'ax206-preview.png') }
+    }
+    if ($LASTEXITCODE -ne 0) { throw "AX206 $Action failed with exit code $LASTEXITCODE." }
+} finally { $env:AX206_LHM_DLL = $oldDll }

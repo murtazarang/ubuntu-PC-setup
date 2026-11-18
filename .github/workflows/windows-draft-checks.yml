@@ -79,3 +79,20 @@ jobs:
       - name: Run isolated Python tests
         shell: pwsh
         run: uv run --no-project --with PyYAML python -m unittest discover -s windows/tests -v
+      - name: AX206 service safe tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          ./windows/aida64_display/tests/test-setup.ps1
+          ./windows/aida64_display/tests/test-launcher.ps1
+          ./windows/aida64_display/tests/test-service.ps1
+          ./windows/aida64_display/tests/test-migration.ps1
+      - name: AX206 service safe tests (PowerShell 7)
+        shell: pwsh
+        run: |
+          ./windows/aida64_display/tests/test-setup.ps1
+          ./windows/aida64_display/tests/test-launcher.ps1
+          ./windows/aida64_display/tests/test-service.ps1
+          ./windows/aida64_display/tests/test-migration.ps1
+      - name: AX206 lifecycle and simulated USB tests
+        shell: pwsh
+        run: uv run --no-project --with Pillow --with PyYAML python -m unittest discover -s windows/aida64_display/tests -v

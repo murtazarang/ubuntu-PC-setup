@@ -1,51 +1,35 @@
 #Requires -Version 5.1
-# Direct entry point: irm https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/windows/aida64_display/install.ps1 | iex
-# The child scope prevents validation attributes leaking into the caller's session.
+# Fresh installation and existing-install migration use the same service installer.
 & {
-    [CmdletBinding()]
-    param(
-        [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'AX206Panel'),
-        [ValidateSet(0,90,180,270)][int]$Rotation = 270,
-        [switch]$SetupOnly
-    )
-    $ErrorActionPreference = 'Stop'
-    if (-not (Get-Command uv.exe -ErrorAction SilentlyContinue)) {
-        throw 'uv is required. Run the PC setup prerequisites or install uv from https://docs.astral.sh/uv/getting-started/installation/ and reopen PowerShell.'
+[CmdletBinding()]
+param(
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'AX206Panel'),
+    [ValidateSet(0,90,180,270)][int]$Rotation = 270
+)
+$ErrorActionPreference = 'Stop'
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Open PowerShell as administrator under your normal account.' }
+if (-not (Get-Command uv.exe -ErrorAction SilentlyContinue)) { throw 'uv is required. Install it using the PC setup prerequisites first.' }
+$hostName = if ($PSVersionTable.PSEdition -eq 'Core') {'pwsh.exe'} else {'powershell.exe'}
+$hostExe = Join-Path $PSHOME $hostName
+$runDir = Join-Path $env:TEMP ('ax206-service-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $runDir | Out-Null
+try {
+    $archive = Join-Path $runDir 'setup.zip'
+    Invoke-WebRequest 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive -UseBasicParsing
+    Expand-Archive -LiteralPath $archive -DestinationPath $runDir
+    $scripts = Join-Path $runDir 'ubuntu-PC-setup-main\windows\aida64_display'
+    foreach ($name in @('Setup.ps1','Service.ps1','Run.ps1','service_host.py','safe_theme.py','panel.py','lifecycle.py','usb_transport.py','portrait.yaml','LICENSE')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $scripts $name) -PathType Leaf)) { throw "Downloaded archive is missing AX206 file: $name" }
     }
-    $hostName = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
-    $hostExe = Join-Path $PSHOME $hostName
-    if (-not (Test-Path -LiteralPath $hostExe -PathType Leaf)) { throw "PowerShell executable not found: $hostExe" }
-    $InstallDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($InstallDir)
-    # Retain the downloaded scripts, including after a failure, for diagnosis/resume.
-    $runDir = Join-Path $InstallDir ('setup-runs\' + [guid]::NewGuid().ToString())
-    New-Item -ItemType Directory -Path $runDir -Force | Out-Null
-    try {
-        Write-Host 'Downloading the AX206 setup from GitHub main...'
-        $archive = Join-Path $runDir 'setup.zip'
-        Invoke-WebRequest -Uri 'https://github.com/murtazarang/ubuntu-PC-setup/archive/refs/heads/main.zip' -OutFile $archive -UseBasicParsing
-        Expand-Archive -LiteralPath $archive -DestinationPath $runDir
-        $scripts = Join-Path $runDir 'ubuntu-PC-setup-main\windows\aida64_display'
-        foreach ($name in @('Setup.ps1','Run.ps1','panel.py','portrait.yaml','LICENSE','autostart.ps1','power_events.py','usb_transport.py')) {
-            if (-not (Test-Path -LiteralPath (Join-Path $scripts $name) -PathType Leaf)) {
-                throw "Downloaded archive is missing AX206 file: $name"
-            }
-        }
-        # Child-process policy only; no persistent policy or registry change.
-        $setupArgs = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $scripts 'Setup.ps1'),'-InstallDir',$InstallDir)
-        if ($PSBoundParameters.ContainsKey('Rotation')) { $setupArgs += @('-Rotation', [string]$Rotation) }
-        & $hostExe @setupArgs
-        if ($LASTEXITCODE -ne 0) { throw "AX206 Setup.ps1 failed with exit code $LASTEXITCODE. See its output above." }
-        Remove-Item -LiteralPath $archive
-        $quotedHost = $hostExe.Replace("'", "''")
-        $quotedDir = $InstallDir.Replace("'", "''")
-        Write-Host 'Setup complete. Existing startup rotation and theme were preserved unless this was a new installation.'
-        Write-Host 'To inspect USB resolution or diagnose access:'
-        Write-Host "& '$quotedHost' -NoProfile -ExecutionPolicy Bypass -File '$quotedDir\Run.ps1' -InstallDir '$quotedDir' -Action Info"
-        Write-Host 'Automatic startup is enabled. The display starts without a terminal after your next Windows sign-in.'
-        Write-Host 'Any currently running display was left alone. Sign out and back in to load this update; you can close this setup terminal.'
-    } catch {
-        Write-Host "Downloaded setup files remain at: $runDir"
-        throw
-    }
+    $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $scripts 'Setup.ps1'),'-InstallDir',$InstallDir)
+    if ($PSBoundParameters.ContainsKey('Rotation')) { $arguments += @('-Rotation',[string]$Rotation) }
+    & $hostExe @arguments
+    if ($LASTEXITCODE -ne 0) { throw "AX206 service setup failed with exit code $LASTEXITCODE." }
+    Write-Host 'Service setup complete. You can close this terminal.'
+} catch {
+    Write-Host "Downloaded setup files remain at $runDir"
+    throw
+}
 } @args
-

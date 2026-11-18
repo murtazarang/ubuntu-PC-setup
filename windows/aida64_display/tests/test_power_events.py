@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from power_events import DisplayState, WindowsPowerListener, SingleInstance
+from lifecycle import DisplayState, SingleInstance
 
 
 class Device:
@@ -74,31 +74,6 @@ class StateTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == 'win32', 'Windows message pump test')
 class WindowsTests(unittest.TestCase):
-    def test_actual_hidden_window_with_synthetic_messages(self):
-        import ctypes
-        from ctypes import wintypes as w
-        state = DisplayState()
-        state.device = Device()
-        with WindowsPowerListener(state) as listener:
-            send = listener.user32.SendMessageW
-            send.argtypes = [w.HWND, w.UINT, w.WPARAM, w.LPARAM]
-            send.restype = ctypes.c_ssize_t
-            self.assertEqual(send(listener.hwnd, 0x0011, 0, 0), 1)
-            self.assertEqual(state.device.off, 0)
-            send(listener.hwnd, 0x0016, 0, 0)  # canceled shutdown
-            self.assertFalse(state.stopped.is_set())
-            send(listener.hwnd, 0x0218, 4, 0)
-            self.assertTrue(state.paused.is_set())
-            self.assertEqual(state.device.off, 1)
-            send(listener.hwnd, 0x0218, 18, 0)
-            send(listener.hwnd, 0x0218, 7, 0)
-            self.assertFalse(state.paused.is_set())
-            self.assertTrue(state.reopen.is_set())
-            send(listener.hwnd, 0x0016, 1, 0)
-            self.assertTrue(state.stopped.is_set())
-        self.assertFalse(listener.thread.is_alive())
-        self.assertIsNone(listener.error)
-
     def test_duplicate_instance(self):
         with SingleInstance():
             with self.assertRaises(RuntimeError):
