@@ -233,3 +233,31 @@ class PrivilegedReadOnlyScanTests(unittest.TestCase):
  def test_matching_executable_fails_closed(self):
   payload=self.payload();payload['packages']=[os.readlink('/proc/'+str(os.getpid())+'/exe')]
   r=self.execute(payload);self.assertNotEqual(r.returncode,0);self.assertIn('still running',r.stderr)
+
+class PrivilegedFallbackProductionTests(unittest.TestCase):
+ def test_declined_and_missing_sudo_refuse_and_use_absolute_command(self):
+  import re,unittest.mock,types
+  script=(ROOT/'remove-legacy-ai.sh').read_text()
+  code=re.search(r'PACKAGE_FILES="\$package_files" python3 - "\$\{paths\[@\]\}" <<\'PY\'\n(.*?)\nPY',script,re.S).group(1)
+  class FakeFile:
+   def __init__(self,name):self.name=name
+   def read_text(self):
+    if self.name=='stat':return '321 (fixture) '+ ' '.join(['0']*19+['12345'])
+    if self.name=='status':return 'Name:\tfixture\nUid:\t1001\n'
+    return 'fixture'
+   def read_bytes(self):return b'fixture\0'
+  class FakeProc:
+   name='321'
+   def stat(self):return types.SimpleNamespace(st_uid=1001)
+   def __truediv__(self,name):return FakeFile(name)
+  original=pathlib.Path.glob
+  def glob(path,pattern):
+   return iter([FakeProc()]) if str(path)=='/proc' else original(path,pattern)
+  for behavior in (types.SimpleNamespace(returncode=1),FileNotFoundError('sudo missing')):
+   with self.subTest(behavior=behavior), unittest.mock.patch.dict(os.environ,{'PACKAGE_FILES':''}), unittest.mock.patch('sys.argv',['guard','/owned/runtime']), unittest.mock.patch('os.getuid',return_value=1001), unittest.mock.patch('os.getpid',return_value=123), unittest.mock.patch.object(pathlib.Path,'glob',glob), unittest.mock.patch('os.readlink',side_effect=PermissionError('protected exe')), unittest.mock.patch('subprocess.run') as sudo:
+    if isinstance(behavior,Exception):sudo.side_effect=behavior
+    else:sudo.return_value=behavior
+    with self.assertRaises(SystemExit) as error:exec(compile(code,'production-process-guard','exec'),{})
+    self.assertIn('no deletion',str(error.exception))
+    argv=sudo.call_args.args[0];self.assertEqual(argv[:4],['/usr/bin/sudo','/usr/bin/python3','-I','-c'])
+    payload=json.loads(argv[-1]);self.assertEqual(payload['uid'],1001);self.assertEqual(payload['processes'][0]['pid'],321);self.assertEqual(payload['processes'][0]['started'],'12345')
