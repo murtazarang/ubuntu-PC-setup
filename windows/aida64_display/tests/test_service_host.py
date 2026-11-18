@@ -1,13 +1,40 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from service_host import ServiceLifecycle, make_service
+from service_host import ServiceLifecycle, make_service, load_system_backend
 from lifecycle import DisplayState
 
 
 class ServiceTests(unittest.TestCase):
+    def test_backend_uses_only_explicit_system_dll_and_falls_back(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'libusb0.dll').touch()
+            (root / 'libusb-1.0.dll').touch()
+            seen = []
+            def loader(module):
+                def get_backend(find_library):
+                    seen.append((module, find_library('ignored')))
+                    if module.endswith('libusb0'):
+                        raise OSError('wrong DLL architecture')
+                    return 'mock-backend'
+                return SimpleNamespace(get_backend=get_backend)
+            with self.assertLogs(level='ERROR'):
+                result = load_system_backend(root, loader)
+            self.assertEqual(result, ('mock-backend','libusb1'))
+            self.assertEqual(seen, [('usb.backend.libusb0', str(root/'libusb0.dll')),
+                                    ('usb.backend.libusb1', str(root/'libusb-1.0.dll'))])
+
+    def test_no_user_directory_backend_fallback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            def loader(module):
+                self.fail('Must not search a backend without a protected DLL')
+            with self.assertRaises(RuntimeError):
+                load_system_backend(Path(folder), loader)
+
     def test_suspend_resume_stop(self):
         state = DisplayState()
         life = ServiceLifecycle(state)

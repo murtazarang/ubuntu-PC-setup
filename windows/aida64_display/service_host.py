@@ -39,13 +39,19 @@ def service_backend():
     length = get_dir(buffer, len(buffer))
     if not length or length >= len(buffer):
         raise RuntimeError('Cannot resolve the protected Windows system directory')
-    system = Path(buffer.value)
+    return load_system_backend(Path(buffer.value), importlib.import_module)
+
+
+def load_system_backend(system, loader):
     for module, name in [('libusb0','libusb0.dll'), ('libusb1','libusb-1.0.dll')]:
         dll = system / name
         if dll.is_file():
-            backend = importlib.import_module('usb.backend.' + module).get_backend(find_library=lambda _: str(dll))
-            if backend is not None:
-                return backend, module
+            try:
+                backend = loader('usb.backend.' + module).get_backend(find_library=lambda _: str(dll))
+                if backend is not None:
+                    return backend, module
+            except Exception:
+                logging.exception('Could not load protected USB backend %s', dll)
     raise RuntimeError('No usable libusb0.dll or libusb-1.0.dll in Windows System32. '
                        'Service does not load USB libraries from user-writable folders. '
                        'The existing USB driver was not changed.')
