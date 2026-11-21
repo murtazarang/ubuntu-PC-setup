@@ -5,6 +5,7 @@ class EntryTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as t:
    p=pathlib.Path(t);src=p/'src';src.mkdir();home=p/'home';home.mkdir();bin=p/'bin';bin.mkdir();log=p/'calls'
    shutil.copy(ROOT/'migrate-existing-ai.sh',src)
+   (bin/'uv').write_text('#!/bin/sh\nexit 99\n'); (bin/'uv').chmod(0o755)
    for name in ['migrate-openwebui.sh','install-hermes-local-ai.sh']:
     (src/name).write_text('#!/bin/sh\nprintf "%s\\n" "'+name+' $*" >> "$CALLS"\n')
    (src/'retire-legacy-text.py').write_text('import os;open(os.environ["CALLS"],"a").write("retire-legacy-text\\n")')
@@ -28,10 +29,11 @@ class EntryTests(unittest.TestCase):
    r=subprocess.run(['python3','-c',block,str(manifest)],env=env,capture_output=True,text=True)
    self.assertNotEqual(r.returncode,0);self.assertIn('no download started',r.stderr)
  def test_fresh_stack_has_no_cleanup_callgraph(self):
-  fresh=(ROOT/'configure-openwebui.sh').read_text()+(ROOT/'configure-skills.sh').read_text()+(ROOT/'finish-openwebui.sh').read_text()
+  fresh=(ROOT/'setup.sh').read_text()+(ROOT/'install-hermes-local-ai.sh').read_text()
   for old in ['remove-legacy-ai.sh','remove-omp-runtime.py','migrate-openwebui.sh','DELETE LEGACY AI','REMOVE OMP']:
    self.assertNotIn(old,fresh)
-  self.assertIn('finish-openwebui.sh',fresh)
+  self.assertIn('install-hermes-local-ai.sh',fresh)
+  self.assertNotIn('configure-openwebui.sh',fresh)
  def test_finish_only_calls_shared_import(self):
   with tempfile.TemporaryDirectory() as t:
    p=pathlib.Path(t);shutil.copy(ROOT/'finish-openwebui.sh',p)
