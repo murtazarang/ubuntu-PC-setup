@@ -35,36 +35,9 @@ Run in a **logged-in GNOME desktop session**:
 ./setup.sh desktop
 ```
 
-This tries the linked Stremio deb and approved Flatpak fallback; installs ArtCraft Studio, Steam, Spotify, VS Code and Mailspring; configures the desktop, Firefox, full skills and local document tools; and installs native Open WebUI connected to Colibri. It no longer installs OMP, Paseo, Strata or XeStrata. Setup downloads a checksum-verified text GGUF, resuming interrupted transfers and reusing verified local files.
+This installs the desktop applications and local document tools, configures GNOME and Firefox, and installs native **Hermes Agent + llama.cpp**. Use **Start Local AI** in the application menu; it loads the assigned model and opens the official Hermes browser workspace when ready. **Stop Local AI** frees model memory. For model assignments, skills, offline Wikipedia and verification, see [Local AI setup](docs/hermes-local-ai.md).
 
-### Offline educational reference
-
-The desktop stage prepares all three complete skill collections for Open WebUI and installs OpenZIM through its official mcpo bridge. Complete the authenticated first-use import after creating your local WebUI account. See [native Open WebUI setup](docs/openwebui-linux.md). The desktop stage also downloads the Wikipedia archive (about 49 GiB). To retry or resume that download separately, run:
-
-```bash
-./download-wikipedia.sh
-```
-
-This downloads the English full-text June 2026 Wikipedia snapshot without pictures to `~/.local/share/kiwix-mcp/archives`. An interrupted download can be resumed. To use a different location, set `KIWIX_ARCHIVE_DIR` to the same directory when running both `./configure-kiwix.sh` and `./download-wikipedia.sh`. Use the Wikipedia tool in Open WebUI to search the archive and cite the article. The archive is a dated snapshot and source lookup does not guarantee that a model's answer is correct. Textbook PDF search is not included. No cloud account is needed for the bridge.
-
-
-### Colibri on the three Ubuntu PCs
-
-All three use the official Colibri v2.1.0 Linux CPU+Vulkan release, verified with its release SHA-256. No CUDA toolkit/source build is required. Existing proprietary NVIDIA or Intel Mesa/Vulkan drivers must already work (`vulkaninfo --summary`).
-
-- RTX 3080: one Vulkan device, `COLI_VULKAN=1`.
-- Two RTX 3060s: additionally `COLI_VK_DEV2=auto`, the upstream second-device expert tier. This is not a promise of 24 GB contiguous memory or measured speedup; model support, budgets and actual use of both GPUs must be verified. Upstream documents that its second-device tests do not establish performance on two real GPUs.
-- Intel Arc B580: Vulkan selects a preferred discrete GPU. Check the startup log names the B580 rather than the CPU/iGPU.
-
-Setup selects Qwen3.8-27B UD-Q4_K_M text GGUF for the RTX 3080 and Arc B580, and Qwen3.8-Flash-Next IQ2_XS for the dual RTX 3060. It imports the verified GGUF through native `coli import --mode link --no-mtp`, without copying large weights or a PyTorch conversion. Models live in `~/colibri-models/<profile>/{source,model}`. Keep the source directory: imported metadata points at its weights. Copying a verified source directory to the same relative location on another PC avoids downloading it again; rerun setup to rebuild local links. Existing customized imported metadata is preserved rather than overwritten.
-
-Run `./configure-ai.sh NvidiaSingle`, `NvidiaDual`, or `Intel` to select explicitly; default detection recognizes the three requested PCs and otherwise stops with instructions. `COLIBRI_MODELS_DIR` can set another model root. Launch **Colibri Serve** from the desktop/app menu. GNOME may require **Allow Launching** once. It starts native `coli serve` and the modern `coli ui` (port 8790, backend 8000) together in a visible terminal. Keep it open; Ctrl+C stops the foreground process group. Existing occupied server/UI ports are not reused or killed. The shortcut applies Vulkan and the dual-GPU expert-tier flag only for NvidiaDual. No autostart or custom model-running service is installed.
-
-Use the **Colibri Serve** and **Colibri Serve Image** desktop shortcuts to start a model, and their **Stop** shortcuts to release its memory. Starting one stops only the other setup-managed model. **Open WebUI** starts the UI and Wikipedia bridge, then opens the browser. Text inference uses localhost:8000; images use localhost:8001. The text GGUFs do not accept images/video. Supporting-model GPU setup is currently enabled for NVIDIA with CUDA; Intel Arc B580 uses OpenVINO GPU for embeddings and reranking, with explicit device detection and no CPU inference fallback. Intel speech remains unconfigured pending its backend decision.
-
-Setup also downloads the native Qwen-Image-2.1 checkpoint (about 33 GB) with the same resume/hash/reuse checks, and creates **Colibri Serve Image** with a **Serve Img** icon label. It invokes upstream `coli web` directly on loopback port **8001**, using isolated Python with NumPy and Pillow. Text Serve uses **8000**. Run one at a time unless memory permits both; separate ports do not guarantee enough combined GPU/RAM capacity. Image generation is distinct from the text model's input capabilities. The image checkpoint's license limits use to research/evaluation; read its downloaded LICENSE before use. The image shortcut opens the upstream image-generation web frontend automatically. The modern `coli ui` does not implement image generation, so it is used only for text. No third desktop UI shortcut is created.
-
-For an existing setup, use the [dedicated AI migration workflow](#existing-ubuntu-pcs-ai-migration-only), not the fresh Desktop stage. It removes the confirmed old stack and skill/app-data roots first, then installs the new stack; Wikipedia and unrelated/new-stack data are protected. The standalone `remove-legacy-ai.sh` remains a cleanup-only inventory tool; it is not the complete replacement installer.
+This is the fresh setup path. To replace old AI software on an existing PC, use the [dedicated AI migration](#existing-ubuntu-pcs-ai-migration-only). An existing image-generation installation is separate from this text setup.
 
 Mailspring ID is optional; configure your email yourself. Steam and Spotify are installed but not signed in. On first Steam launch, complete Steam setup and select the current stable Proton under **Settings → Compatibility** for other titles; verify a game yourself. No online account is created by these scripts.
 
@@ -97,15 +70,14 @@ It creates one partition and mounts it at `/mnt/storage` using a UUID. The choic
 python3 -m unittest discover -s tests -v
 ```
 
-Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, Open WebUI's ability to search Wikipedia, imported skill completeness, and the image/text models on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
+Check Firefox add-ons/filters, GNOME shortcuts, both 3060s, Steam Proton with a real game, Hermes's ability to search Wikipedia, discovered skill completeness, and the text model on the actual computers. A local endpoint responding is not proof a model, tools, gaming, or both GPUs work correctly. The scripts do not create accounts for third-party services.
 
 ## Sources and verification
 
 - [Ubuntu installer storage](https://canonical-subiquity.readthedocs-hosted.com/en/latest/howto/configure-storage.html)
 - [Ubuntu NVIDIA drivers](https://ubuntu.com/server/docs/nvidia-drivers-installation/)
 - [Timeshift](https://github.com/linuxmint/timeshift)
-- [Colibri UI](https://github.com/JustVugg/colibri/blob/v2.1.0/ui/README.md), [Vulkan/dual-device backend](https://github.com/JustVugg/colibri/blob/v2.1.0/docs/vulkan.md)
-- [Open WebUI installation](https://docs.openwebui.com/getting-started/quick-start/), [skills](https://docs.openwebui.com/features/workspace/skills/)
+- [Hermes local models](https://hermes-agent.nousresearch.com/docs/user-guide/local-models) and [llama.cpp GPU placement](https://github.com/ggml-org/llama.cpp/blob/b12359/docs/multi-gpu.md)
 - [Firefox policies](https://firefox-admin-docs.mozilla.org/reference/policies/extensionsettings/), [uBlock managed configuration](https://github.com/gorhill/uBlock/wiki/Deploying-uBlock-Origin:-configuration)
 
 ## Existing Ubuntu PCs: AI migration only
@@ -116,4 +88,4 @@ Do not rerun full desktop setup to replace the old AI stack. Run:
 bash <(curl -fsSL https://raw.githubusercontent.com/murtazarang/ubuntu-PC-setup/main/migrate-existing-ai.sh)
 ```
 
-This dedicated path inventories and confirms irreversible old-stack/skill/app-data deletion first, retaining Wikipedia, then provisions the replacement AI stack and verifies it after local signup. Failure after deletion cannot restore the removed data. Fresh installation instead uses the import-only `finish-openwebui.sh` and never runs migration/cleanup. See [exact migration and first-use steps](docs/openwebui-linux.md#existing-pc-migration-separate-from-fresh-setup).
+This workflow protects your existing Wikipedia archive or partial, inventories legacy software, and runs the new AI installer separately from the rest of desktop setup. Read the [migration and retention details](docs/hermes-local-ai.md#existing-pcs) before confirming any legacy cleanup.

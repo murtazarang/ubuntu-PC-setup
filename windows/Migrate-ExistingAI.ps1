@@ -14,11 +14,36 @@ foreach($tool in @('uv.exe','git.exe','curl.exe')){
 }
 $root=Join-Path $env:LOCALAPPDATA 'OpenWebUI-PC-Setup'
 $reference=Join-Path $env:LOCALAPPDATA 'OpenZIM\reference.json'
-if(-not $ArchiveDirectory){
-    if(Test-Path -LiteralPath $reference){$ArchiveDirectory=[string](Get-Content -LiteralPath $reference -Raw|ConvertFrom-Json).archive_directory}
-    else{$ArchiveDirectory=Join-Path $env:LOCALAPPDATA 'OpenZIM\archives'}
+if(Test-Path -LiteralPath $reference){
+    $item=Get-Item -LiteralPath $reference -Force
+    while($null -ne $item){
+        if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "Refusing linked Wikipedia reference: $($item.FullName). No cleanup started."}
+        $item=if($item -is [IO.FileInfo]){$item.Directory}else{$item.Parent}
+    }
+    $record=Get-Content -LiteralPath $reference -Raw | ConvertFrom-Json
+    if(-not $record.archive_directory -or -not $record.archive -or
+       -not [IO.Path]::IsPathFullyQualified([string]$record.archive_directory) -or
+       -not [IO.Path]::IsPathFullyQualified([string]$record.archive)){
+        throw 'Existing Wikipedia manifest is invalid; no cleanup or download started.'
+    }
+    $savedArchive=[IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath([string]$record.archive_directory))
+    $savedFile=[IO.Path]::GetFullPath([string]$record.archive)
+    if($savedFile -ine (Join-Path $savedArchive 'wikipedia_en_all_nopic_2026-06.zim')){
+        throw 'Existing Wikipedia manifest points to a different archive; no cleanup or download started.'
+    }
+    if($ArchiveDirectory -and [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($ArchiveDirectory)) -ine $savedArchive){
+        throw 'Requested archive directory conflicts with the existing Wikipedia manifest; no cleanup or download started.'
+    }
+    $ArchiveDirectory=$savedArchive
+}elseif(-not $ArchiveDirectory){
+    $ArchiveDirectory=Join-Path $env:LOCALAPPDATA 'OpenZIM\archives'
 }
-if(-not $ArchiveDirectory){throw 'Existing reference manifest has no archive directory; supply -ArchiveDirectory explicitly.'}
+if(-not [IO.Path]::IsPathFullyQualified($ArchiveDirectory)){throw 'Use an absolute Wikipedia archive path.'}
+foreach($file in @('Install-HermesLocalAI.ps1','Retire-LegacyText.ps1','retire_legacy_text_windows.py')){
+    if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)){
+        throw "Missing migration companion $file; no cleanup started."
+    }
+}
 # BEGIN migration stages
 # Reject even confirmed legacy deletion when it overlaps active replacement data.
 . (Join-Path $PSScriptRoot 'Remove-LegacyAI.ps1')
@@ -28,7 +53,7 @@ Assert-LegacyCorpusAbsent $legacyCandidates
 $activeReference=if(Test-Path -LiteralPath $reference){Get-Content -LiteralPath $reference -Raw|ConvertFrom-Json}else{[pscustomobject]@{archive_directory=$ArchiveDirectory;archive=(Join-Path $ArchiveDirectory 'wikipedia_en_all_nopic_2026-06.zim')}}
 $colibriSettings=Join-Path $env:LOCALAPPDATA 'Colibri-PC-Setup\settings.json'
 $activeColibri=if(Test-Path -LiteralPath $colibriSettings){Get-Content -LiteralPath $colibriSettings -Raw|ConvertFrom-Json}else{[pscustomobject]@{models=(Join-Path $env:USERPROFILE 'colibri-models')}}
-$protected=@($root,[string]$activeReference.archive,[string]$activeReference.archive_directory,[string]$activeColibri.models,(Join-Path $env:LOCALAPPDATA 'OMP-Skills'),(Join-Path $env:USERPROFILE '.omp'))
+$protected=@($root,$ArchiveDirectory,(Join-Path $env:LOCALAPPDATA 'OpenZIM'),(Join-Path $env:USERPROFILE '.hermes'),(Join-Path $env:LOCALAPPDATA 'PCSetup\local-ai'),[string]$activeReference.archive,[string]$activeReference.archive_directory,[string]$activeColibri.models,(Join-Path $env:LOCALAPPDATA 'OMP-Skills'),(Join-Path $env:USERPROFILE '.omp'))
 $desktopFile=Join-Path $root 'desktop.json'
 $desktopConfig=if(Test-Path -LiteralPath $desktopFile){Get-Content -LiteralPath $desktopFile -Raw|ConvertFrom-Json}else{[pscustomobject]@{text_model=(Join-Path $activeColibri.models 'dense27b\model');image_model=(Join-Path $activeColibri.models 'qwen-image-2.1\model')}}
 foreach($modelPath in @([string]$desktopConfig.text_model,[string]$desktopConfig.image_model)){
@@ -69,15 +94,7 @@ $skillProtected=@($protected|Where-Object {$_ -ine $oldCollections -and $_ -ine 
 & (Join-Path $PSScriptRoot 'Remove-LegacyAI.ps1') -Apply -RequireRemoval -SkipOmpConfig
 & (Join-Path $PSScriptRoot 'Remove-OldSkillCollections.ps1') -CleanupAuthorizedThisRun -ProtectedPaths $skillProtected
 & (Join-Path $PSScriptRoot 'Remove-VerifiedOMP.ps1') -CleanupAuthorizedThisRun
-& (Join-Path $PSScriptRoot 'Install-Reference.ps1') -ArchiveDirectory $ArchiveDirectory
-& (Join-Path $PSScriptRoot 'Install-Colibri.ps1') -Hardware $Hardware -NoShortcut
-& (Join-Path $PSScriptRoot 'Install-OpenWebUI.ps1')
-$python=Join-Path $root 'venv\Scripts\python.exe'
-& $python (Join-Path $root 'openwebui_desktop.py') ui --root $root
-if($LASTEXITCODE -ne 0){throw 'Open WebUI did not start. The old stack has already been removed as requested; rerun migration to retry setup.'}
-Write-Host 'Create your local Open WebUI account in the browser if this is its first launch. Existing accounts/settings remain.'
-Read-Host 'Press Enter once your local account is ready; the next step verifies the replacement imports and Wikipedia'
-& $python (Join-Path $root 'openwebui_skills.py') import --root (Join-Path $root 'skill-repos') --url http://127.0.0.1:8080 --wiki-key-file (Join-Path $root 'wikipedia-api-key') --reference-manifest $reference
-if($LASTEXITCODE -ne 0){throw 'Replacement verification failed after the requested old-stack removal. Rerun migration to continue; Wikipedia remains.'}
+& (Join-Path $PSScriptRoot 'Install-HermesLocalAI.ps1') -Hardware $Hardware -ArchiveDirectory $ArchiveDirectory
+& (Join-Path $PSScriptRoot 'Retire-LegacyText.ps1') -Root $root
 # END migration stages
-Write-Host 'Existing-PC AI migration completed. Colibri/Open WebUI are ready; unrelated desktop applications/settings were not changed.'
+Write-Host 'Existing-PC AI migration finished. Colibri image serving and Open WebUI data were preserved.'

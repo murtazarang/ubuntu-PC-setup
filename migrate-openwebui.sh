@@ -10,7 +10,7 @@ base="${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui"
 python3 - "$base" "${XDG_DATA_HOME:-$HOME/.local/share}" <<'PYPROTECT'
 import json,pathlib,sys
 base,data=map(pathlib.Path,sys.argv[1:])
-protected=[base,data/'pc-setup-colibri',pathlib.Path(__import__('os').environ.get('KIWIX_ARCHIVE_DIR',str(pathlib.Path.home()/'.local/share/kiwix-mcp/archives')))]
+protected=[base,data/'pc-setup-colibri',data/'pc-setup/local-ai',pathlib.Path(__import__('os').environ.get('KIWIX_ARCHIVE_DIR',str(pathlib.Path.home()/'.local/share/kiwix-mcp/archives')))]
 if (base/'reference.json').exists():
  reference=json.loads((base/'reference.json').read_text());protected.append(pathlib.Path(reference['archive']))
 if (data/'pc-setup-colibri/managed-models.json').exists():

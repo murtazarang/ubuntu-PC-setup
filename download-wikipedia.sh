@@ -30,7 +30,7 @@ if [[ $file == *.part ]]; then mv -- "$file" "$dir/$name";fi
 echo "Verified: $dir/$name"
 
 base="${XDG_DATA_HOME:-$HOME/.local/share}/pc-setup-openwebui"
-python3 - "$base/reference.json" "$dir/$name" "$expected" <<'PYRECORD'
+python3 - "${KIWIX_REFERENCE_MANIFEST:-$base/reference.json}" "$dir/$name" "$expected" <<'PYRECORD'
 import json,os,pathlib,sys,tempfile
 p=pathlib.Path(sys.argv[1]);record={'archive':str(pathlib.Path(sys.argv[2]).absolute()),'sha256':sys.argv[3]}
 if any(q.is_symlink() for q in (p,*p.parents)): raise SystemExit('Refusing linked verification record path')

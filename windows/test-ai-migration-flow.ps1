@@ -9,7 +9,7 @@ foreach($forbidden in @('Setup.ps1','Install-Apps.ps1','Configure-Firefox.ps1','
 }
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('ai-migration-flow-'+[guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp|Out-Null
-$old=@{};foreach($key in @('TEST_AI_ROOT','TEST_AI_LOG','TEST_FAIL_IMPORT','TEST_FAIL_LEGACY','TEST_LEGACY_ROOT','LOCALAPPDATA')){$old[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
+$old=@{};foreach($key in @('TEST_AI_ROOT','TEST_AI_LOG','TEST_FAIL_INSTALL','TEST_FAIL_LEGACY','TEST_LEGACY_ROOT','LOCALAPPDATA')){$old[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
     $root=Join-Path $temp 'root';$env:TEST_AI_ROOT=$root
     $env:LOCALAPPDATA=$temp
@@ -22,17 +22,15 @@ try {
     if($LASTEXITCODE -ne 0){throw 'Fixture Python creation failed'}
     Set-Content (Join-Path $root 'desktop.json') '{"text_model":"C:\\fixture-models\\text","image_model":"C:\\fixture-models\\image"}'
     Set-Content (Join-Path $root 'openwebui_desktop.py') "import os,sys; open(os.environ['TEST_AI_LOG'],'a').write(sys.argv[1]+'\n')"
-    Set-Content (Join-Path $root 'openwebui_skills.py') "import os,sys; assert '--reference-manifest' in sys.argv; open(os.environ['TEST_AI_LOG'],'a').write('verified-import\n'); sys.exit(1 if os.environ.get('TEST_FAIL_IMPORT')=='1' else 0)"
-    foreach($name in @('Install-Reference.ps1','Install-Colibri.ps1','Install-OpenWebUI.ps1')){
-        Set-Content (Join-Path $temp $name) "Add-Content -LiteralPath `$env:TEST_AI_LOG -Value '$name'"
-    }
+    Set-Content (Join-Path $temp 'Install-HermesLocalAI.ps1') 'param([string]$Hardware,[string]$ArchiveDirectory);if($Hardware -ne "NvidiaSingle" -or $ArchiveDirectory -ne "C:\fixture"){throw "Lost installation arguments"};Add-Content $env:TEST_AI_LOG install;if($env:TEST_FAIL_INSTALL -eq "1"){throw "Installer failed fixture"}'
+    Set-Content (Join-Path $temp 'Retire-LegacyText.ps1') 'param([string]$Root);if($Root -ne $env:TEST_AI_ROOT){throw "Wrong old root"};Add-Content $env:TEST_AI_LOG retire'
     Set-Content (Join-Path $temp 'Remove-LegacyAI.ps1') 'param([switch]$Apply,[switch]$RequireRemoval,[switch]$SkipOmpConfig); if($MyInvocation.InvocationName -eq "."){function Assert-LegacyCorpusAbsent($Candidates) {& (Join-Path $PSScriptRoot "Assert-NoCorpus.ps1") -CandidatePaths @($Candidates|ForEach-Object {$_.Path})}; function Get-LegacyCandidates {if($env:TEST_LEGACY_ROOT){return [pscustomobject]@{Path=$env:TEST_LEGACY_ROOT}};return @()};return}; if(-not($Apply -and $RequireRemoval -and $SkipOmpConfig)){throw "Missing migration guards"}; Add-Content $env:TEST_AI_LOG legacy; if($env:TEST_FAIL_LEGACY -eq "1"){throw "Declined fixture"}'
     Set-Content (Join-Path $temp 'Remove-VerifiedOMP.ps1') 'param([switch]$CleanupAuthorizedThisRun,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing authorization gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG omp-inventory}else{Add-Content $env:TEST_AI_LOG omp}'
     Set-Content (Join-Path $temp 'Remove-OMPBinary.ps1') '# inert fixture'
     Set-Content (Join-Path $temp 'Remove-OldSkillCollections.ps1') 'param([switch]$CleanupAuthorizedThisRun,[string[]]$ProtectedPaths,[switch]$InventoryOnly);if(-not $CleanupAuthorizedThisRun){throw "Missing gate"};if($InventoryOnly){Add-Content $env:TEST_AI_LOG old-inventory}else{Add-Content $env:TEST_AI_LOG old-skills}'
     $driver=Join-Path $temp 'driver.ps1'
     Set-Content $driver ('$ErrorActionPreference="Stop";$root=$env:TEST_AI_ROOT;$Hardware="NvidiaSingle";$ArchiveDirectory="C:\fixture";$reference=Join-Path $env:LOCALAPPDATA "reference.json"'+[Environment]::NewLine+$block)
-    foreach($case in @('import-fails','legacy-declines','success','linked-weights','unregistered-zim','unregistered-part')){
+    foreach($case in @('install-fails','legacy-declines','success','linked-weights','unregistered-zim','unregistered-part')){
         $env:TEST_AI_LOG=Join-Path $temp ($case+'.log')
         # A correct protection preflight can reject the run before any stage emits an event.
         [IO.File]::WriteAllText($env:TEST_AI_LOG,'')
@@ -54,7 +52,7 @@ try {
             Set-Content (Join-Path $nested $name) 'preserve even without manifest'
         }
 
-        $env:TEST_FAIL_IMPORT=if($case -eq 'import-fails'){'1'}else{'0'}
+        $env:TEST_FAIL_INSTALL=if($case -eq 'install-fails'){'1'}else{'0'}
         $env:TEST_FAIL_LEGACY=if($case -eq 'legacy-declines'){'1'}else{'0'}
         $previousErrorAction=$ErrorActionPreference
         try {
@@ -65,13 +63,15 @@ try {
         } finally {$ErrorActionPreference=$previousErrorAction}
         $events=@(Get-Content $env:TEST_AI_LOG)
         if('text' -in $events -or 'image' -in $events){throw 'Migration must not start or switch a model'}
-        if($case -eq 'success' -or $case -eq 'import-fails'){
-            $legacyIndex=[array]::IndexOf($events,'legacy');$skillsIndex=[array]::IndexOf($events,'old-skills');$ompIndex=[array]::IndexOf($events,'omp');$installIndex=[array]::IndexOf($events,'Install-Reference.ps1')
+        if($case -eq 'success' -or $case -eq 'install-fails'){
+            $legacyIndex=[array]::IndexOf($events,'legacy');$skillsIndex=[array]::IndexOf($events,'old-skills');$ompIndex=[array]::IndexOf($events,'omp');$installIndex=[array]::IndexOf($events,'install')
             if($legacyIndex -lt 0 -or $skillsIndex -le $legacyIndex -or $ompIndex -le $skillsIndex -or $installIndex -le $ompIndex){throw 'Cleanup must occur before any replacement installation'}
             if($case -eq 'success' -and $code -ne 0){throw 'Successful migration failed'}
-            if($case -eq 'import-fails' -and $code -eq 0){throw 'Replacement import failure was falsely reported as complete'}
+            if($case -eq 'install-fails' -and $code -eq 0){throw 'Replacement install failure was falsely reported as complete'}
+            if($case -eq 'success' -and 'retire' -notin $events){throw 'Retirement did not follow successful installation'}
+            if($case -eq 'install-fails' -and 'retire' -in $events){throw 'Retired old text after a failed replacement install'}
         }else{
-            if($code -eq 0 -or 'omp' -in $events -or 'old-skills' -in $events -or 'Install-Reference.ps1' -in $events){throw "$case must block later cleanup and installation"}
+            if($code -eq 0 -or 'omp' -in $events -or 'old-skills' -in $events -or 'install' -in $events){throw "$case must block later cleanup and installation"}
             if($case -in @('linked-weights','unregistered-zim','unregistered-part') -and 'legacy' -in $events){throw 'Active linked weights must block ALL deletion'}
         }
     }
